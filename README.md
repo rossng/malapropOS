@@ -2,6 +2,8 @@
 
 Adapted from the COMS20001 unit at the University of Bristol.
 
+Compiles against Red Hat Newlib instead of GCC libc.
+
 ## Features
 
 ### Current

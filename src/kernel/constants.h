@@ -4,6 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-extern uint32_t process_memory_start;
+extern uint32_t stack_top_usr;
 
 #endif

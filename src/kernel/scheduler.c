@@ -40,13 +40,13 @@ void scheduler_initialise( ctx_t* ctx ) {
   pcb[ 0 ].pid      = 0;
   pcb[ 0 ].ctx.cpsr = 0x50;
   pcb[ 0 ].ctx.pc   = ( uint32_t )( entry_P0 );
-  pcb[ 0 ].ctx.sp   = ( uint32_t )(  &process_memory_start );
+  pcb[ 0 ].ctx.sp   = ( uint32_t )(  &stack_top_usr );
 
   memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );
   pcb[ 1 ].pid      = 1;
   pcb[ 1 ].ctx.cpsr = 0x50;
   pcb[ 1 ].ctx.pc   = ( uint32_t )( entry_P1 );
-  pcb[ 1 ].ctx.sp   = ( uint32_t )(  &process_memory_start + 1000 );
+  pcb[ 1 ].ctx.sp   = ( uint32_t )(  &stack_top_usr + 1000 );
 
   PL011_puts( UART0 , "Scheduler: switching to process 0\n", 34);
   current = &pcb[ 0 ]; memcpy( ctx, &current->ctx, sizeof( ctx_t ) );
