@@ -1,0 +1,19 @@
+.vagrant/
+*.tar.gz
+*.o
+*.gch
+*.a
+*.bin
+*.elf
+*.out
+
+# CMake stuff
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Makefile
+cmake_install.cmake
+install_manifest.txt
+
+# CLion
+.idea/
