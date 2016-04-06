@@ -1,5 +1,7 @@
 # MalapropOS
 
+Adapted from the COMS20001 unit at the University of Bristol.
+
 ## Features
 
 ### Current
