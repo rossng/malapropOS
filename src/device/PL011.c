@@ -39,38 +39,52 @@ char itox( int  x ) {
   return -1;
 }
 
-void PL011_putc( PL011_t* d, uint8_t x ) {
-  while( d->FR & 0x20 ) {
-    /* wait while transmit FIFO is full */
-  }
-
-  d->DR = x;
+void PL011_putc(PL011_t* d, uint8_t x) {
+        while (d->FR & 0x20) {
+                /* wait while transmit FIFO is full */
+        }
+        d->DR = x;
 }
 
-void PL011_puts( PL011_t* d, char* str, uint32_t len ) {
-  for( int i = 0 ; (i<len) && str[i] != '\0' ; i++ ) {
-    while( d->FR & 0x20 ) {
-      /* wait while transmit FIFO is full */
-    }
-    d->DR = str[i];
-  }
+void PL011_puts(PL011_t* d, char* str, uint32_t len) {
+        for (int i = 0 ; (i<len) && str[i] != '\0' ; i++) {
+                while( d->FR & 0x20 ) {
+                        /* wait while transmit FIFO is full */
+                }
+                d->DR = str[i];
+        }
 }
 
-void PL011_puti( PL011_t* d, uint32_t num ) {
-  for( int i = 7 ; i >= 0 ; i-- ) {
-    while( d->FR & 0x20 ) {
-      /* wait while transmit FIFO is full */
-    }
-    d->DR = itox((num >> (4*i)) & 0xF);
-  }
+void PL011_puti(PL011_t* d, uint32_t num) {
+        for (int i = 7 ; i >= 0 ; i--) {
+                while (d->FR & 0x20) {
+                        /* wait while transmit FIFO is full */
+                }
+                d->DR = itox((num >> (4*i)) & 0xF);
+        }
 }
 
-uint8_t PL011_getc( PL011_t* d            ) {
-  while( d->FR & 0x10 ) {
-    /* wait while receive FIFO is empty */
-  }
+uint8_t PL011_getc (PL011_t* d) {
+        while (d->FR & 0x10) {
+                /* wait while receive FIFO is empty */
+        }
+        return d->DR;
+}
 
-  return d->DR;
+ssize_t PL011_gets(PL011_t* d, char* buf, size_t nbytes) {
+        while (d->FR & 0x10) {
+                // wait while receive FIFO is full
+        }
+        buf[0] = d->DR;
+        ssize_t done;
+        for (done = 1 ; done < nbytes ; done++) {
+                if (d->FR & 0x10) {
+                        // Immediately give up if receiving is blocked
+                        break;
+                }
+                buf[done] = d->DR;
+        }
+        return done;
 }
 
 void PL011_puth( PL011_t* d, uint8_t x ) {

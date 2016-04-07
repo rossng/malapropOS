@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 // cooperatively yield control of processor, i.e., invoke the scheduler
 void yield();
@@ -16,8 +17,8 @@ int _fstat(int file, struct stat *st);
 int _isatty(int file);
 int _lseek(int file, int ptr, int dir);
 int _open(const char *name, int flags, int mode);
-int _read(int file, char *ptr, int len);
+int _read(int fd, char *buf, size_t nbytes);
 caddr_t _sbrk(int incr);
-int _write(int file, char *ptr, int len);
+ssize_t _write(int fd, char *buf, size_t nbytes);
 
 #endif

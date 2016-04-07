@@ -1,32 +1,10 @@
 #include "syscall.h"
 
 void yield() {
-  asm volatile( "svc #0     \n"  );
+  asm volatile( "svc #158     \n"  );
 }
 
-int write( int fd, void* x, size_t n ) {
-  int r;
-
-  asm volatile( "mov r0, %1 \n"
-                "mov r1, %2 \n"
-                "mov r2, %3 \n"
-                "svc #1     \n"
-                "mov %0, r0 \n"
-              : "=r" (r)
-              : "r" (fd), "r" (x), "r" (n)
-              : "r0", "r1", "r2" );
-
-  return r;
-}
-
-enum {
- UART_FR_RXFE = 0x10,
- UART_FR_TXFF = 0x20,
- UART0_ADDR = 0x10009000,
-};
-
-#define UART_DR(baseaddr) (*(unsigned int *)(baseaddr))
-#define UART_FR(baseaddr) (*(((unsigned int *)(baseaddr))+6))
+/* Initial implementations of these syscalls adapted from https://balau82.wordpress.com/2010/12/16/using-newlib-in-arm-bare-metal-programs/ */
 
 int _close(int file) { return -1; }
 
@@ -41,19 +19,19 @@ int _lseek(int file, int ptr, int dir) { return 0; }
 
 int _open(const char *name, int flags, int mode) { return -1; }
 
-int _read(int file, char *ptr, int len) {
- int todo;
- if(len == 0)
-  return 0;
- while(UART_FR(UART0_ADDR) & UART_FR_RXFE);
- *ptr++ = UART_DR(UART0_ADDR);
- for(todo = 1; todo < len; todo++) {
-  if(UART_FR(UART0_ADDR) & UART_FR_RXFE) {
-   break;
- }
- *ptr++ = UART_DR(UART0_ADDR);
- }
- return todo;
+int _read(int fd, char *buf, size_t nbytes) {
+  int r;
+
+  asm volatile( "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "svc #3     \n"
+                "mov %0, r0 \n"
+              : "=r" (r)
+              : "r" (fd), "r" (buf), "r" (nbytes)
+              : "r0", "r1", "r2" );
+
+  return r;
 }
 
 char *heap_end = 0;
@@ -76,11 +54,17 @@ caddr_t _sbrk(int incr) {
  return (caddr_t) prev_heap_end;
  }
 
-int _write(int file, char *ptr, int len) {
- int todo;
+ssize_t _write(int fd, char *buf, size_t nbytes) {
+  int r;
 
- for (todo = 0; todo < len; todo++) {
-  UART_DR(UART0_ADDR) = *ptr++;
- }
- return len;
- }
+  asm volatile( "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "svc #4     \n"
+                "mov %0, r0 \n"
+              : "=r" (r)
+              : "r" (fd), "r" (buf), "r" (nbytes)
+              : "r0", "r1", "r2" );
+
+  return r;
+}
