@@ -9,3 +9,5 @@
 
 # CLion
 .idea/
+
+mlibc/build/
