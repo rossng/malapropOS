@@ -40,13 +40,11 @@ handler_irq:
 
 handler_svc:
         sub   lr, lr, #0              @ correct return address
-        sub   sp, sp, #60             @ update SVC mode stack pointer
-        															 @ 60 bytes is space for the 15 4-byte registers
+        sub   sp, sp, #60             @ update SVC mode stack pointer 60 bytes is space for the 15 4-byte registers
         stmia sp, { r0-r12, sp, lr }^ @ store the 15 USR mode registers on stack
         mrs   r0, spsr                @ get the USR mode CSPR (saved into SPSR)
-        stmdb sp!, { r0, lr }         @ auto-extend the stack to store r0 (contains
-         														 @ the USR mode CPSR) and lr (contains the USR
-        														 @ mode PC)
+        stmdb sp!, { r0, lr }         @ auto-extend the stack to store r0 (contains the USR mode CPSR) and lr (contains the USR mode PC)
+        
         mov   r0, sp                  @ set    C function arg. = SP
         ldr   r1, [ lr, #-4 ]         @ load                     svc instruction
         bic   r1, r1, #0xFF000000     @ set    C function arg. = svc immediate

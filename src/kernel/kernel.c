@@ -70,6 +70,11 @@ void kernel_handler_irq(ctx_t* ctx) {
 
 void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
         switch (id) {
+                case 0 : { // exit
+                        int status = (int)(ctx->gpr[0]);
+                        scheduler_exit(ctx);
+                        break;
+                }
                 case 3 : { // read
                         int fd = (int)(ctx->gpr[0]);
                         char* ptr = (char*)(ctx->gpr[1]);

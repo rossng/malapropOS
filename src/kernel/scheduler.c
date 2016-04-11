@@ -50,6 +50,29 @@ void scheduler_run(ctx_t* ctx) {
 }
 
 /**
+ * Terminate the current process.
+ */
+void scheduler_exit(ctx_t* ctx) {
+        if (TAILQ_EMPTY(&head)) {
+                PL011_puts(UART0, "Scheduler: cannot exit last remaining process\n", 46);
+        } else if (!current) {
+                PL011_puts(UART0, "Scheduler: no process currently executing\n", 42);
+        } else {
+                PL011_puts(UART0, "Scheduler: exiting\n", 19);
+                // Schedule the next process from the queue. Do not re-add the
+                // current process to the queue
+                tailq_pcb_t *p = TAILQ_FIRST(&head);
+                memcpy(&(current->ctx), &(p->pcb.ctx), sizeof(ctx_t));
+                current->pid = p->pcb.pid;
+                TAILQ_REMOVE(&head, p, entries);
+                free(p);
+                memcpy(ctx, &(current->ctx), sizeof(ctx_t));
+        }
+
+        return;
+}
+
+/**
  * Initialise two processes, then store one process' context pointer to
  * into the provided location.
  */

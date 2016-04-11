@@ -21,7 +21,8 @@ typedef struct tailq_pcb_s {
         TAILQ_ENTRY(tailq_pcb_s) entries;
 } tailq_pcb_t;
 
-void scheduler_run( ctx_t* ctx );
-void scheduler_initialise();
+void scheduler_initialise(ctx_t* ctx);
+void scheduler_run(ctx_t* ctx);
+void scheduler_exit(ctx_t* ctx);
 
 #endif

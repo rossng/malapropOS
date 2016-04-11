@@ -6,12 +6,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-// cooperatively yield control of processor, i.e., invoke the scheduler
-void yield();
-
-// write n bytes from x to the file descriptor fd
-int write( int fd, void* x, size_t n );
-
+void _yield();
+void _exit(int status);
 int _close(int file);
 int _fstat(int file, struct stat *st);
 int _isatty(int file);
