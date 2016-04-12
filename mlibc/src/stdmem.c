@@ -17,12 +17,13 @@ void* stdmem_copy(void* destination, const void* source, size_t numbytes) {
         char* dest = (char*)dest;
 
         for (int i = 0 ; i < numbytes ; i++) {
-                destination[i] = source[i];
+                dest[i] = src[i];
         }
 
         return destination;
 }
 
 void stdmem_free(void* ptr) {
+        // At the moment, just don't bother
         return;
 }

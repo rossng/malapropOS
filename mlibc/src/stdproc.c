@@ -1,9 +1,11 @@
 #include <stdproc.h>
+#include <syscall.h>
 
-pid_t stdproc_fork(void) {
-        return 0;
+void stdproc_exit(procres_t result) {
+        _exit(result);
 }
 
-void stdproc_exit() {
-        return;
+pid_t stdproc_fork(void) {
+        // TODO: implement fork
+        return _fork();
 }

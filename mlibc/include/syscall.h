@@ -4,8 +4,9 @@
 #include <stddef.h>
 #include <stdtypes.h>
 
-void _yield();
-void _exit(int32_t status);
+void _yield(void);
+void _exit(procres_t result);
+pid_t _fork(void);
 
 int32_t _read(int32_t fd, char *buf, size_t nbytes);
 size_t _write(int32_t fd, char *buf, size_t nbytes);

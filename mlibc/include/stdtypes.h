@@ -19,6 +19,8 @@ typedef unsigned char           uchar_t;
 typedef uint32_t                wchar_t;
 typedef uint32_t                size_t;
 typedef uint32_t                addr_t;
-typedef int32_t                 pid_t;
+typedef int32_t                 filedesc_t; // File descriptor
+typedef int32_t                 pid_t;      // Process identifier
+typedef int32_t                 procres_t;  // Process result
 
 #endif

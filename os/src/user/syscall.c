@@ -13,6 +13,11 @@ void _exit(int status) {
                 : "r0");
 }
 
+pid_t _fork() {
+        // TODO: implement _fork
+        return NULL;
+}
+
 int32_t _read(int32_t fd, char *buf, size_t nbytes) {
         int r;
         asm volatile(

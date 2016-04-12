@@ -3,9 +3,9 @@
 
 #include <stdtypes.h>
 
-#define EXIT_SUCCESS 1
+#define EXIT_SUCCESS 0
 
-void stdproc_exit();
+void stdproc_exit(procres_t result);
 
 pid_t stdproc_fork(void);
 

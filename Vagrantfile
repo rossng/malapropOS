@@ -76,6 +76,7 @@ Vagrant.configure(2) do |config|
     sudo tar -xvf gcc-linaro-5.1-2015.08-x86_64_arm-eabi.tar.xz -C /usr/local/ > /dev/null
     sudo apt-get update --fix-missing > /dev/null
     sudo apt-get install qemu-system qemu-kvm qemu gcc-arm-none-eabi -y > /dev/null
+    sudo apt-get install doxygen -y > /dev/null
     cd /vagrant
   SHELL
 end
