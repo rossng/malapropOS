@@ -76,7 +76,7 @@ void scheduler_exit(ctx_t* ctx) {
  * into the provided location.
  */
 void scheduler_initialise(ctx_t* ctx) {
-        PL011_puts(UART0 , "Scheduler: initialising\n", 24);
+        PL011_puts(UART0, "Scheduler: initialising\n", 24);
 
         TAILQ_INIT(&head);
 

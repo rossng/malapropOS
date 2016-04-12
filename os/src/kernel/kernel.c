@@ -80,7 +80,7 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         char* ptr = (char*)(ctx->gpr[1]);
                         int len = (int)(ctx->gpr[2]);
 
-                        ssize_t result = sys_read(fd, ptr, len);
+                        int32_t result = sys_read(fd, ptr, len);
 
                         ctx->gpr[0] = result;
                         break;
@@ -90,7 +90,7 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         char* ptr = (char*)(ctx->gpr[1]);
                         int len = (int)(ctx->gpr[2]);
 
-                        ssize_t result = sys_write(fd, ptr, len);
+                        int32_t result = sys_write(fd, ptr, len);
 
                         ctx->gpr[0] = result;
                         break;

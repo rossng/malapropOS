@@ -13,8 +13,8 @@ void* stdmem_allocate(size_t size) {
 }
 
 void* stdmem_copy(void* destination, const void* source, size_t numbytes) {
-        char* src = (char*)src;
-        char* dest = (char*)dest;
+        char* src = (char*)source;
+        char* dest = (char*)destination;
 
         for (int i = 0 ; i < numbytes ; i++) {
                 dest[i] = src[i];
