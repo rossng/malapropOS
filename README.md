@@ -2,7 +2,7 @@
 
 Adapted from the COMS20001 unit at the University of Bristol.
 
-Compiles against Red Hat Newlib instead of GCC libc.
+MalapropOS has a custom libc called `mlibc`. The implementation of TAILQ is from FreeBSD. The implementation of `stdarg.h` is from GCC.
 
 ## Features
 
@@ -22,3 +22,19 @@ Compiles against Red Hat Newlib instead of GCC libc.
 ## Supported platforms
 
 * RealView Platform Cortex-A8 (tested in QEMU)
+
+## Build
+
+* `vagrant up`
+* `vagrant ssh`
+* `cd /vagrant/mlibc`
+* `make build`
+* `cd /vagrant/os`
+* `make build`
+
+## Run
+
+* `make launch-qemu` launches malapropOS in QEMU, paused before execution
+* `make launch-gdb` launches a GDB session connected to QEMU. Use `c` to continue execution.
+* `Ctrl+C q Return y Return` will quit GDB
+* `make kill-qemu` will kill QEMU
