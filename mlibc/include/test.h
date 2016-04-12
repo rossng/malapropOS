@@ -1,1 +1,0 @@
-int myfun(int a);

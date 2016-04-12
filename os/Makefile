@@ -7,7 +7,7 @@
  PROJECT_TARGETS    = image.elf image.bin
 
  QEMU_PATH        = /usr
- QEMU_GDB         =        127.0.0.1:1234
+ QEMU_GDB         = 127.0.0.1:1234
  QEMU_UART        = stdio
 #QEMU_UART       += telnet:127.0.0.1:1235,server
 #QEMU_UART       += telnet:127.0.0.1:1236,server
@@ -15,20 +15,20 @@
  LINARO_PATH      = /usr/local/gcc-linaro-5.1-2015.08-x86_64_arm-eabi
  LINARO_PREFIX    = arm-eabi
 
- MLIBC_INCLUDES   = ../mlibc/includes
+ MLIBC_INCLUDES   = ../mlibc/include
 
 # part 2a: OS build commands
 %.o : %.s
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATHS} ${MLIBC_INCLUDES}/include) -mcpu=cortex-a8 -g -o ${@} ${<}
+	@${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATHS} ${MLIBC_INCLUDES}) -mcpu=cortex-a8 -g -o ${@} ${<}
 
 %.o : %.c
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATHS} ${MLIBC_INCLUDES}/include) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -O -o ${@} ${<}
+	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATHS} ${MLIBC_INCLUDES}) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -O -o ${@} ${<}
 
 %.elf : ${PROJECT_OBJECTS}
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L , ../mlibc/build ${LINARO_PATH}/arm-eabi/libc/usr/lib ) -T ${*}.ld -o ${@} ${^} -lc -lgcc -nostdlib
+	@${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L , ../mlibc/build ${LINARO_PATH}/arm-eabi/libc/usr/lib ) -T ${*}.ld -o ${@} ${^} -lc -lgcc -nostdlib
 
 %.bin : %.elf
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-objcopy -O binary ${<} ${@}
+	@${LINARO_PATH}/bin/${LINARO_PREFIX}-objcopy -O binary ${<} ${@}
 
 
 # part 3: targets

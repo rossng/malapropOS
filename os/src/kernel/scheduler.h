@@ -2,7 +2,7 @@
 #define __SCHEDULER_H
 
 #include <stddef.h>
-#include <stdint.h>
+#include <stdtypes.h>
 #include <sys/queue.h>
 
 typedef struct {

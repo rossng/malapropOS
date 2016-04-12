@@ -2,7 +2,7 @@
 #define __SP804_H
 
 #include <stddef.h>
-#include <stdint.h>
+#include <stdtypes.h>
 
 /* The ARM Dual-Timer Module (SP804) is documented at
  * 

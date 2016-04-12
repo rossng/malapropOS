@@ -71,12 +71,12 @@ uint8_t PL011_getc (PL011_t* d) {
         return d->DR;
 }
 
-ssize_t PL011_gets(PL011_t* d, char* buf, size_t nbytes) {
+size_t PL011_gets(PL011_t* d, char* buf, size_t nbytes) {
         while (d->FR & 0x10) {
                 // wait while receive FIFO is full
         }
         buf[0] = d->DR;
-        ssize_t done;
+        size_t done;
         for (done = 1 ; done < nbytes ; done++) {
                 if (d->FR & 0x10) {
                         // Immediately give up if receiving is blocked

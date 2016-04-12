@@ -2,26 +2,26 @@
 #define __GIC_H
 
 #include <stddef.h>
-#include <stdint.h>
+#include <stdtypes.h>
 
 /* Although the GIC architecture is documented at
- * 
+ *
  * the platform includes a bespoke implementation based on the combination
  * of 4 GIC components in total.
- * 
+ *
  * - Section 3.14 gives a high-level overview of the interrupt mechanism,
  *   noting in particular that GIC0 and GIC1 are those associated with the
  *   ARM core (managing IRQ- and FIQ-based interrupts respectively),
  * - Section 4.11 describes the GIC implementation, which sub-divides each
- *   GIC into interface and distributor components: it includes 
- * 
- *   - Table 4.44,           i.e., the mapping of interrupt signals from 
+ *   GIC into interface and distributor components: it includes
+ *
+ *   - Table 4.44,           i.e., the mapping of interrupt signals from
  *     other devices to interrupt IDs wrt. each GIC,
- *   - Tables 4.46 and 4.55, i.e., the device register layout (including 
- *     an offset from the device base address, in the memory map, for each 
+ *   - Tables 4.46 and 4.55, i.e., the device register layout (including
+ *     an offset from the device base address, in the memory map, for each
  *     register), plus
  *   - a summary of the internal structure of each device register.
- * 
+ *
  * Note that the field identifiers used here follow the documentation in a
  * general sense, but with a some minor alterations to improve clarity and
  * consistency.
@@ -74,9 +74,9 @@ typedef volatile struct {
 #define GIC_SOURCE_UART3  ( 47 )
 
 /* We know from
- * 
+ *
  * http://infocenter.arm.com/help/topic/com.arm.doc.dui0417d/index.html
- * 
+ *
  * that the platform has 4 GIC devices(s), each of which we capture as an
  * instance of the GICC_t and GICD_t structures.
  */

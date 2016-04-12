@@ -2,9 +2,7 @@
 #define __PL011_H
 
 #include <stddef.h>
-#include <stdint.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <stdtypes.h>
 
 /* The ARM PrimeCell UART (PL011) is documented at
  *
@@ -76,7 +74,7 @@ uint8_t PL011_geth(PL011_t* d);
 
 // transmit string str via PL011 instance d up to length len or first nul byte
 void PL011_puts(PL011_t* d, char* buf, uint32_t nbytes);
-ssize_t PL011_gets(PL011_t* d, char* buf, size_t nbytes);
+size_t PL011_gets(PL011_t* d, char* buf, size_t nbytes);
 
 void PL011_puti( PL011_t* d, uint32_t num );
 

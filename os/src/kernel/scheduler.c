@@ -4,8 +4,7 @@
 #include "../user/P1.h"
 #include "../device/PL011.h"
 
-#include "string.h"
-#include <stdlib.h>
+#include <stdmem.h>
 
 pcb_t pcb[2];
 pcb_t *current = NULL;
@@ -23,8 +22,8 @@ void scheduler_run(ctx_t* ctx) {
         if (current) {
                 // Allocate a new queue entry, store the process details into it
                 // and then add it to the back of the queue
-                tailq_pcb_t *tailq_pcb_entry = malloc(sizeof(tailq_pcb_t));
-                memcpy(&(tailq_pcb_entry->pcb.ctx), ctx, sizeof(ctx_t));
+                tailq_pcb_t *tailq_pcb_entry = stdmem_allocate(sizeof(tailq_pcb_t));
+                stdmem_copy(&(tailq_pcb_entry->pcb.ctx), ctx, sizeof(ctx_t));
                 tailq_pcb_entry->pcb.pid = current->pid;
                 TAILQ_INSERT_TAIL(&head, tailq_pcb_entry, entries);
         }
@@ -32,16 +31,16 @@ void scheduler_run(ctx_t* ctx) {
         // If there is a process waiting to execute
         if (!TAILQ_EMPTY(&head)) {
                 if (!current) {
-                        current = malloc(sizeof(pcb_t));
+                        current = stdmem_allocate(sizeof(pcb_t));
                 }
                 // Get a pointer to the first waiting process, copy its details
                 // into current, remove from queue then store the current context into ctx
                 tailq_pcb_t *p = TAILQ_FIRST(&head);
-                memcpy(&(current->ctx), &(p->pcb.ctx), sizeof(ctx_t));
+                stdmem_copy(&(current->ctx), &(p->pcb.ctx), sizeof(ctx_t));
                 current->pid = p->pcb.pid;
                 TAILQ_REMOVE(&head, p, entries);
-                free(p);
-                memcpy(ctx, &(current->ctx), sizeof(ctx_t));
+                stdmem_free(p);
+                stdmem_copy(ctx, &(current->ctx), sizeof(ctx_t));
         } else {
                 current = NULL;
         }
@@ -62,11 +61,11 @@ void scheduler_exit(ctx_t* ctx) {
                 // Schedule the next process from the queue. Do not re-add the
                 // current process to the queue
                 tailq_pcb_t *p = TAILQ_FIRST(&head);
-                memcpy(&(current->ctx), &(p->pcb.ctx), sizeof(ctx_t));
+                stdmem_copy(&(current->ctx), &(p->pcb.ctx), sizeof(ctx_t));
                 current->pid = p->pcb.pid;
                 TAILQ_REMOVE(&head, p, entries);
-                free(p);
-                memcpy(ctx, &(current->ctx), sizeof(ctx_t));
+                stdmem_free(p);
+                stdmem_copy(ctx, &(current->ctx), sizeof(ctx_t));
         }
 
         return;
@@ -81,7 +80,7 @@ void scheduler_initialise(ctx_t* ctx) {
 
         TAILQ_INIT(&head);
 
-        tailq_pcb_t *p0 = malloc(sizeof(tailq_pcb_t));
+        tailq_pcb_t *p0 = stdmem_allocate(sizeof(tailq_pcb_t));
         p0->pcb.pid = 0;
         p0->pcb.ctx.cpsr = 0x50;
         p0->pcb.ctx.pc = (uint32_t)(entry_P0);
@@ -89,7 +88,7 @@ void scheduler_initialise(ctx_t* ctx) {
 
         TAILQ_INSERT_TAIL(&head, p0, entries);
 
-        tailq_pcb_t *p1 = malloc(sizeof(tailq_pcb_t));
+        tailq_pcb_t *p1 = stdmem_allocate(sizeof(tailq_pcb_t));
         p1->pcb.pid = 1;
         p1->pcb.ctx.cpsr = 0x50;
         p1->pcb.ctx.pc = (uint32_t)(entry_P1);

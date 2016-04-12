@@ -2,7 +2,7 @@
 #define __CONSTANTS_H
 
 #include <stddef.h>
-#include <stdint.h>
+#include <stdtypes.h>
 
 extern uint32_t stack_top_usr;
 

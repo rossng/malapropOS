@@ -2,7 +2,7 @@
 #define __FILE_H
 
 #include <stddef.h>
-#include <stdint.h>
+#include <stdtypes.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
