@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 #include <stdtypes.h>
-#include <sys/queue.h>
+#include <datastructures/stdqueue.h>
 
 typedef struct {
         uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
