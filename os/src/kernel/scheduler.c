@@ -34,12 +34,12 @@ void scheduler_run(ctx_t* ctx) {
                         // Allocate a new queue entry, store the process details into it
                         // and then add it to the back of the queue
                         tailq_pcb_t *descheduled_entry = stdmem_allocate(sizeof(tailq_pcb_t));
-                        descheduled_entry->pcb = current_pcb;
+                        stdmem_copy(&(descheduled_entry->pcb), current_pcb, sizeof(pcb_t));
                         stdmem_copy(&(descheduled_entry->pcb.ctx), ctx, sizeof(ctx_t));
                         // Mark the descheduled process as ready (but only if it isn't blocked)
                         if (descheduled_entry->pcb.status == PROCESS_STATUS_RUNNING) {
                                 descheduled_entry->pcb.status = PROCESS_STATUS_READY;
-                                scheduler_emit_event({PROCESS_EVENT_SUSPENDED, descheduled_entry->pcb.pid});
+                                scheduler_emit_event((event_t){PROCESS_EVENT_SUSPENDED, descheduled_entry->pcb.pid});
                         }
                         TAILQ_INSERT_TAIL(&head, descheduled_entry, entries);
                 }
@@ -51,20 +51,20 @@ void scheduler_run(ctx_t* ctx) {
                         }
                         // Get a pointer to the first waiting process, copy its details
                         // into current, remove from queue then store the current context into ctx
-                        tailq_pcb_t *p = TAILQ_FIRST(&head);
-                        current_pcb = p->pcb;
-                        stdmem_copy(&(current_pcb->ctx), &(p->pcb.ctx), sizeof(ctx_t));
-                        TAILQ_REMOVE(&head, p, entries);
-                        stdmem_free(p);
+                        tailq_pcb_t *next_p = TAILQ_FIRST(&head);
+                        stdmem_copy(current_pcb, &(next_p->pcb), sizeof(pcb_t));
+                        stdmem_copy(&(current_pcb->ctx), &(next_p->pcb.ctx), sizeof(ctx_t));
+                        TAILQ_REMOVE(&head, next_p, entries);
+                        stdmem_free(next_p);
                         stdmem_copy(ctx, &(current_pcb->ctx), sizeof(ctx_t));
 
                 } else {
                         current_pcb = NULL;
                 }
-        } while (current_pcb->status != PROCESS_STATUS_READY)
+        } while (current_pcb->status != PROCESS_STATUS_READY);
 
         current_pcb->status = PROCESS_STATUS_RUNNING;
-        scheduler_emit_event({PROCESS_EVENT_UNSUSPENDED, current_pcb->pid});
+        scheduler_emit_event((event_t){PROCESS_EVENT_UNSUSPENDED, current_pcb->pid});
 
         return;
 }
@@ -76,7 +76,7 @@ void scheduler_block_process(ctx_t* ctx, event_t until_event) {
         // Mark the process as blocked
         current_pcb->blocked_until = until_event;
         current_pcb->status = PROCESS_STATUS_BLOCKED;
-        scheduler_emit_event({PROCESS_EVENT_BLOCKED, current_pcb->pid});
+        scheduler_emit_event((event_t){PROCESS_EVENT_BLOCKED, current_pcb->pid});
         // Deschedule
         scheduler_run(ctx);
 }
@@ -102,7 +102,7 @@ void scheduler_exit(ctx_t* ctx) {
                 stdmem_free(p);
                 stdmem_copy(ctx, &(current_pcb->ctx), sizeof(ctx_t));
 
-                scheduler_emit_event({PROCESS_EVENT_EXITED, exited_pid});
+                scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, exited_pid});
         }
 
         return;
@@ -113,13 +113,16 @@ void scheduler_exit(ctx_t* ctx) {
  * Fire the actions associated with a provided process event.
  */
 void scheduler_emit_event(event_t event) {
+        tailq_pcb_t* item;
         TAILQ_FOREACH(item, &head, entries) {
                 // If the process is blocked
                 if (item->pcb.status == PROCESS_STATUS_BLOCKED) {
                         // And it is blocked until this event
-                        if (item->pcb.blocked_until == event) {
+                        if (item->pcb.blocked_until.event == event.event && item->pcb.blocked_until.from_process == event.from_process) {
                                 // Unblock the process
                                 item->pcb.status = PROCESS_STATUS_RUNNING;
+                                // Set the return value of _waitpid to the pid of the event process
+                                item->pcb.ctx.gpr[0] = event.from_process;
                         }
                 }
         }
@@ -145,7 +148,7 @@ pid_t scheduler_fork(ctx_t* ctx) {
 
                 TAILQ_INSERT_TAIL(&head, new_process, entries);
 
-                scheduler_emit_event({PROCESS_EVENT_CREATED, new_process->pcb.pid});
+                scheduler_emit_event((event_t){PROCESS_EVENT_CREATED, new_process->pcb.pid});
 
                 return new_process->pcb.pid;
         }
@@ -169,8 +172,8 @@ pid_t scheduler_getpid(ctx_t* ctx) {
  * Create a new process from the function provided.
  * @return the pid of the new process
  */
-pid_t scheduler_newprocess(ctx_t* ctx, void (*function)()) {
-        tailq_pcb_t *new_proc = stdmem_allocate(sizeof(tailq_pcb_t))
+pid_t scheduler_new_process(ctx_t* ctx, void (*function)()) {
+        tailq_pcb_t *new_proc = stdmem_allocate(sizeof(tailq_pcb_t));
         new_proc->pcb.pid = next_pid++;
         new_proc->pcb.ctx.cpsr = 0x50;
         new_proc->pcb.ctx.pc = (uint32_t)(function);
@@ -179,9 +182,21 @@ pid_t scheduler_newprocess(ctx_t* ctx, void (*function)()) {
 
         TAILQ_INSERT_TAIL(&head, new_proc, entries);
 
-        scheduler_emit_event({PROCESS_EVENT_CREATED, new_proc->pcb.pid});
+        scheduler_emit_event((event_t){PROCESS_EVENT_CREATED, new_proc->pcb.pid});
 
         return new_proc->pcb.pid;
+}
+
+/**
+ * Create a new process from the function provided.
+ * @return the pid of the new process
+ */
+pid_t scheduler_exec(ctx_t* ctx, void (*function)()) {
+        current_pcb->ctx.pc = (uint32_t)(function);
+        current_pcb->ctx.sp = (uint32_t)(set_stack_break(1000));
+        current_pcb->status = PROCESS_STATUS_RUNNING;
+
+        return current_pcb->pid;
 }
 
 /**

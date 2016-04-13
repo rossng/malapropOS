@@ -106,3 +106,13 @@ pid_t _waitpid(procevent_t event, pid_t pid) {
                 : "r0", "r1");
         return r;
 }
+
+void _exec(void (*function)()) {
+        // A dead-simple exec syscall that just starts the function passed as a process
+        asm volatile(
+                "mov r0, %0 \n"
+                "svc #1000  \n"
+                :
+                : "r" (function)
+                : "r0");
+}

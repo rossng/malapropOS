@@ -3,6 +3,7 @@
 #include "sh.h"
 #include "P0.h"
 #include "P1.h"
+#include "syscall.h"
 
 void mush() {
         char* last_line = stdmem_allocate(101);
@@ -17,16 +18,14 @@ void mush() {
                 }
                 stdio_printchar('\n');
                 if (stdstr_compare(last_line, "P1") == 0) {
-                        pid_t waiting_for_pid;
-                        pid_t child_pid = fork();
+                        pid_t child_pid = _fork();
                         int32_t status;
-                        if (pid == 0) {
+                        if (child_pid == 0) {
                                 // If this is the child process, exec the new process
+                                _exec(entry_P0);
                         } else {
                                 // Otherwise, wait for the child to complete
-                                do {
-                                        wpid = waitpid(child_pid, &status, NULL);
-                                } while (status != PROCESS_EXITED);
+                                _waitpid(PROCESS_EVENT_EXITED, child_pid);
                         }
                 }
         }

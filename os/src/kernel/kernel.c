@@ -105,9 +105,9 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         procevent_t status = (procevent_t)(ctx->gpr[0]);
                         pid_t pid = (pid_t)(ctx->gpr[1]);
 
-                        pid_t result = scheduler_block_process(ctx, {status, pid});
-
-                        ctx->gpr[0] = result;
+                        event_t until_event = {status, pid};
+                        scheduler_block_process(ctx, until_event);
+                        // Doesn't return
                         break;
                 }
                 case 20 : { // getpid
@@ -118,6 +118,13 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                 }
                 case 158 : { // yield
                         scheduler_run(ctx);
+                        break;
+                }
+                case 1000 : { // non-standard exec
+                        void (*function)() = (void (*)(void *)) ctx->gpr[0];
+
+                        scheduler_exec(ctx, function);
+
                         break;
                 }
                 default : { // unknown
