@@ -8,4 +8,11 @@
  */
 int32_t stdstr_length(char* str);
 
+/**
+ * @return -1: first non-matching character in str1 is < that in str2
+ *         0: strings are equivalent
+ *         1: first non-matching character in str1 is > that in str2
+ */
+int32_t stdstr_compare(char* str1, char* str2);
+
 #endif

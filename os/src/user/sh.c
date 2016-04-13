@@ -1,6 +1,8 @@
 /* MUSH: the μ shell */
 
 #include "sh.h"
+#include "P0.h"
+#include "P1.h"
 
 void mush() {
         char* last_line = stdmem_allocate(101);
@@ -14,6 +16,19 @@ void mush() {
                         stdio_printchar(last_char);
                 }
                 stdio_printchar('\n');
+                if (stdstr_compare(last_line, "P1") == 0) {
+                        pid_t waiting_for_pid;
+                        pid_t child_pid = fork();
+                        int32_t status;
+                        if (pid == 0) {
+                                // If this is the child process, exec the new process
+                        } else {
+                                // Otherwise, wait for the child to complete
+                                do {
+                                        wpid = waitpid(child_pid, &status, NULL);
+                                } while (status != PROCESS_EXITED);
+                        }
+                }
         }
 }
 

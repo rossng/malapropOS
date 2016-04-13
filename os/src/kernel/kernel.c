@@ -101,6 +101,15 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         ctx->gpr[0] = result;
                         break;
                 }
+                case 7 : { // waitpid
+                        procevent_t status = (procevent_t)(ctx->gpr[0]);
+                        pid_t pid = (pid_t)(ctx->gpr[1]);
+
+                        pid_t result = scheduler_block_process(ctx, {status, pid});
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
                 case 20 : { // getpid
                         pid_t result = scheduler_getpid(ctx);
 
