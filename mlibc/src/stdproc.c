@@ -6,6 +6,9 @@ void stdproc_exit(procres_t result) {
 }
 
 pid_t stdproc_fork(void) {
-        // TODO: implement fork
         return _fork();
+}
+
+pid_t stdproc_getpid(void) {
+        return _getpid();
 }

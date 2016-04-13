@@ -7,6 +7,7 @@
 void _yield(void);
 void _exit(procres_t result);
 pid_t _fork(void);
+pid_t _getpid(void);
 
 int32_t _read(int32_t fd, char *buf, size_t nbytes);
 size_t _write(int32_t fd, char *buf, size_t nbytes);

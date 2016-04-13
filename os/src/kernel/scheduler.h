@@ -24,5 +24,7 @@ typedef struct tailq_pcb_s {
 void scheduler_initialise(ctx_t* ctx);
 void scheduler_run(ctx_t* ctx);
 void scheduler_exit(ctx_t* ctx);
+pid_t scheduler_fork(ctx_t* ctx);
+pid_t scheduler_getpid(ctx_t* ctx);
 
 #endif

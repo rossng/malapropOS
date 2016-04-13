@@ -1,6 +1,8 @@
 #ifndef STDQUEUE_H_
 #define STDQUEUE_H_
 
+#include <stderr.h>
+
 // Based on the FreeBSD TAILQ implementation
 // https://github.com/freebsd/freebsd/blob/master/sys/sys/queue.h
 

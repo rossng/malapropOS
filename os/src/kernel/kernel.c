@@ -75,6 +75,12 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         scheduler_exit(ctx);
                         break;
                 }
+                case 2 : { // fork
+                        pid_t result = scheduler_fork(ctx);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
                 case 3 : { // read
                         int fd = (int)(ctx->gpr[0]);
                         char* ptr = (char*)(ctx->gpr[1]);
@@ -91,6 +97,12 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         int len = (int)(ctx->gpr[2]);
 
                         int32_t result = sys_write(fd, ptr, len);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 20 : { // getpid
+                        pid_t result = scheduler_getpid(ctx);
 
                         ctx->gpr[0] = result;
                         break;

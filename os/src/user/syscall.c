@@ -14,12 +14,19 @@ void _exit(int status) {
 }
 
 pid_t _fork() {
-        // TODO: implement _fork
-        return NULL;
+        pid_t r;
+        asm volatile(
+                "svc #2 \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                :
+                : "r0"
+        );
+        return r;
 }
 
 int32_t _read(int32_t fd, char *buf, size_t nbytes) {
-        int r;
+        int32_t r;
         asm volatile(
                 "mov r0, %1 \n"
                 "mov r1, %2 \n"
@@ -71,5 +78,17 @@ size_t _write(int32_t fd, char *buf, size_t nbytes) {
                 : "=r" (r)
                 : "r" (fd), "r" (buf), "r" (nbytes)
                 : "r0", "r1", "r2");
+        return r;
+}
+
+pid_t _getpid() {
+        pid_t r;
+        asm volatile(
+                "svc #20 \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                :
+                : "r0"
+        );
         return r;
 }
