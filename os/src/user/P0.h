@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdtypes.h>
 
-// define symbols for P0 entry point and top of stack
 extern void (*entry_P0)();
 
 #endif

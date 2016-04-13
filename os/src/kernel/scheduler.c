@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "../user/P0.h"
 #include "../user/P1.h"
+#include "../user/sh.h"
 #include "../device/PL011.h"
 
 #include <stdmem.h>
@@ -128,7 +129,7 @@ void scheduler_initialise(ctx_t* ctx) {
 
         TAILQ_INIT(&head);
 
-        tailq_pcb_t *p0 = stdmem_allocate(sizeof(tailq_pcb_t));
+        /*tailq_pcb_t *p0 = stdmem_allocate(sizeof(tailq_pcb_t));
         p0->pcb.pid = next_pid++;
         p0->pcb.ctx.cpsr = 0x50;
         p0->pcb.ctx.pc = (uint32_t)(entry_P0);
@@ -142,7 +143,15 @@ void scheduler_initialise(ctx_t* ctx) {
         p1->pcb.ctx.pc = (uint32_t)(entry_P1);
         p1->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
 
-        TAILQ_INSERT_TAIL(&head, p1, entries);
+        TAILQ_INSERT_TAIL(&head, p1, entries);*/
+
+        tailq_pcb_t *sh = stdmem_allocate(sizeof(tailq_pcb_t));
+        sh->pcb.pid = next_pid++;
+        sh->pcb.ctx.cpsr = 0x50;
+        sh->pcb.ctx.pc = (uint32_t)(entry_sh);
+        sh->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
+
+        TAILQ_INSERT_TAIL(&head, sh, entries);
 
         //PL011_puts(UART0 , "Scheduler: switching to process 0\n", 34);
         //current = TAILQ_FIRST(&head);
