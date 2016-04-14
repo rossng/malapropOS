@@ -27,13 +27,17 @@ void mush() {
         while (1) {
                 stdio_print("mush> ");
                 char last_char = '\0';
-                for (int i = 0; (i < 100) && (last_char != '\n') && (last_char != '\r'); i++) {
+                int32_t i;
+                for (i = 0; (i < 100) && (last_char != '\n') && (last_char != '\r'); i++) {
                         last_char = stdio_readchar();
                         last_line[i] = last_char;
                         stdio_printchar(last_char);
                 }
+                last_line[i] = '\0';
                 stdio_printchar('\n');
-                if (stdstr_compare(last_line, "P1\r") == 0) {
+                if (stdstr_compare(last_line, "exit\r") == 0) {
+                        _exit(EXIT_SUCCESS);
+                } else if (stdstr_compare(last_line, "P1\r") == 0) {
                         launch_process(entry_P0);
                 }
         }
