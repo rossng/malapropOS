@@ -11,11 +11,12 @@ MalapropOS has a custom libc called `mlibc`. The implementation of TAILQ is from
 * Communication over UART
 * Basic interrupt handling
 * Pre-emptive multi-tasking with a fixed process list and fixed timeslices
+* Dynamic creation and destruction of process with `fork()` and `exit()`
+* A very basic interactive shell, `mμsh`
 
 ### Planned
 
-* Dynamic creation and destruction of process with `fork()` and `exit()`
-* A better scheduling algorithm
+* A priority-based scheduling algorithm
 * IPC
 * A simple file system
 
