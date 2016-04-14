@@ -38,6 +38,7 @@
 build       : ${PROJECT_TARGETS}
 
 launch-qemu : ${PROJECT_TARGETS}
+	@stty intr ^]
 	@${QEMU_PATH}/bin/qemu-system-arm -M realview-pb-a8 -m 128M -display none -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -S -kernel $(filter %.bin, ${PROJECT_TARGETS})
 
 launch-gdb  : ${PROJECT_TARGETS}

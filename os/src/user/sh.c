@@ -21,19 +21,69 @@ void launch_process(void (*function)()) {
         }
 }
 
+void get_line(char* buf, size_t nbytes) {
+        buf[0] = '\0';
+        char last_char = '\0';
+        int32_t cursor_index = 0;
+        int32_t end_of_str = 0;
+        while ((cursor_index < nbytes) && (last_char != '\n') && (last_char != '\r')) {
+                last_char = stdio_readchar();
+                // Backspace has some weird legacy mapping: http://www.ibb.net/%7Eanne/keyboard/keyboard.html
+                if (last_char == '\b' || last_char == 0x7f) {
+                        if (cursor_index > 0) {
+                                stdio_print("\b \b"); // Go back, overwrite the character with a space, go back again
+                                cursor_index--;
+                                end_of_str--;
+                        }
+                } else if (last_char == '\n' || last_char == '\r') {
+                        cursor_index = end_of_str;
+                        buf[cursor_index] = '\r';
+                        cursor_index++;
+                        stdio_print("\r");
+                } else if (last_char == 27) { // ESC
+                        char next = stdio_readchar();
+                        if (next != '[') {
+                                stdio_print("^ESC");
+                                stdio_printchar(next);
+                                end_of_str += 4;
+                                cursor_index += 4;
+                        } else if (stdio_readchar() == 'D') { // Left arrow
+                                if (cursor_index > 0) {
+                                        stdio_printchar('\b');
+                                        cursor_index--;
+                                }
+                        } else if (stdio_readchar() == 'C') { // Right arrow
+                                if (cursor_index < end_of_str) {
+                                        cursor_index++;
+                                }
+                        }
+                } else {
+                        char prev = buf[cursor_index];
+                        char current;
+                        buf[cursor_index] = last_char;
+                        stdio_printchar(buf[cursor_index]);
+                        end_of_str++;
+                        cursor_index++;
+                        for (int fixup_index = cursor_index; fixup_index < end_of_str; fixup_index++) {
+                                stdio_printchar(prev);
+                                current = buf[fixup_index];
+                                buf[fixup_index] = prev;
+                                prev = current;
+                        }
+                        for (int backspaces_needed = end_of_str-cursor_index; backspaces_needed > 0; backspaces_needed--) {
+                                stdio_printchar('\b');
+                        }
+                }
+        }
+        buf[cursor_index] = '\0';
+}
+
 void mush() {
         char* last_line = stdmem_allocate(101);
         stdio_print("Welcome to the mu shell\n");
         while (1) {
                 stdio_print("mush> ");
-                char last_char = '\0';
-                int32_t i;
-                for (i = 0; (i < 100) && (last_char != '\n') && (last_char != '\r'); i++) {
-                        last_char = stdio_readchar();
-                        last_line[i] = last_char;
-                        stdio_printchar(last_char);
-                }
-                last_line[i] = '\0';
+                get_line(last_line, 100);
                 stdio_printchar('\n');
                 if (stdstr_compare(last_line, "exit\r") == 0) {
                         _exit(EXIT_SUCCESS);

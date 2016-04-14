@@ -15,4 +15,7 @@ int32_t stdstr_length(char* str);
  */
 int32_t stdstr_compare(char* str1, char* str2);
 
+void stdstr_int_to_str(int32_t n, char* str);
+void stdstr_reverse(char* str);
+
 #endif

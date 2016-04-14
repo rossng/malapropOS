@@ -9,6 +9,13 @@ void stdio_printchar(char c) {
         _write(STDOUT_FILEDESC, &c, 1);
 }
 
+void stdio_printint(int32_t n) {
+        char str[10] = {0};
+        stdstr_int_to_str(n, str);
+
+        _write(STDOUT_FILEDESC, str, stdstr_length(str));
+}
+
 void stdio_file_print(filedesc_t fd, char* str) {
         _write(fd, str, stdstr_length(str));
 }
