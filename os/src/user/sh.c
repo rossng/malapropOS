@@ -6,6 +6,21 @@
 #include "syscall.h"
 #include "../device/PL011.h"
 
+
+void launch_process(void (*function)()) {
+        pid_t child_pid = _fork();
+        int32_t status;
+        if (child_pid == 0) {
+                // If this is the child process, exec the new process
+                PL011_puts(UART0, "mush: child\n", 12);
+                _exec(entry_P0);
+        } else {
+                // Otherwise, wait for the child to complete
+                PL011_puts(UART0, "mush: parent\n", 13);
+                _waitpid(PROCESS_EVENT_EXITED, child_pid);
+        }
+}
+
 void mush() {
         char* last_line = stdmem_allocate(101);
         stdio_print("Welcome to the mu shell\n");
@@ -19,17 +34,7 @@ void mush() {
                 }
                 stdio_printchar('\n');
                 if (stdstr_compare(last_line, "P1\r") == 0) {
-                        pid_t child_pid = _fork();
-                        int32_t status;
-                        if (child_pid == 0) {
-                                // If this is the child process, exec the new process
-                                PL011_puts(UART0, "mush: child\n", 12);
-                                _exec(entry_P0);
-                        } else {
-                                // Otherwise, wait for the child to complete
-                                PL011_puts(UART0, "mush: parent\n", 13);
-                                _waitpid(PROCESS_EVENT_EXITED, child_pid);
-                        }
+                        launch_process(entry_P0);
                 }
         }
 }

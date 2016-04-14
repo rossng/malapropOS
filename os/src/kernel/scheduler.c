@@ -141,8 +141,10 @@ pid_t scheduler_fork(ctx_t* ctx) {
                 // and stack pointer
                 tailq_pcb_t *new_process = stdmem_allocate(sizeof(tailq_pcb_t));
                 copy_pcb(&(new_process->pcb), current_pcb);
+                copy_ctx(&(new_process->pcb.ctx), ctx);
                 new_process->pcb.pid = next_pid++;
                 new_process->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
+                new_process->pcb.status = PROCESS_STATUS_READY;
                 new_process->pcb.ctx.gpr[0] = 0; // The child process should receive 0 from the fork call
 
                 TAILQ_INSERT_TAIL(&head, new_process, entries);
@@ -191,8 +193,8 @@ pid_t scheduler_new_process(ctx_t* ctx, void (*function)()) {
  * @return the pid of the new process
  */
 pid_t scheduler_exec(ctx_t* ctx, void (*function)()) {
-        current_pcb->ctx.pc = (uint32_t)(function);
-        current_pcb->ctx.sp = (uint32_t)(set_stack_break(1000));
+        ctx->pc = (uint32_t)(function);
+        ctx->sp = (uint32_t)(set_stack_break(1000));
         current_pcb->status = PROCESS_STATUS_RUNNING;
 
         return current_pcb->pid;
