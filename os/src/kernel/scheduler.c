@@ -89,7 +89,7 @@ void scheduler_exit(ctx_t* ctx) {
         } else if (!current_pcb) {
                 PL011_puts(UART0, "Scheduler: no process currently executing\n", 42);
         } else {
-                PL011_puts(UART0, "Scheduler: exiting\n", 19);
+                //PL011_puts(UART0, "Scheduler: exiting\n", 19);
                 pid_t exited_pid = current_pcb->pid;
 
                 // Schedule the next process from the queue. Do not re-add the
@@ -135,7 +135,7 @@ pid_t scheduler_fork(ctx_t* ctx) {
         if (!current_pcb) {
                 PL011_puts(UART0, "Scheduler: no process currently executing\n", 42);
         } else {
-                PL011_puts(UART0, "Scheduler: forking\n", 19);
+                //PL011_puts(UART0, "Scheduler: forking\n", 19);
 
                 // Allocate a new entry in the scheduler queue, setting a new PID
                 // and stack pointer
