@@ -34,8 +34,8 @@ void scheduler_run(ctx_t* ctx) {
                         // Allocate a new queue entry, store the process details into it
                         // and then add it to the back of the queue
                         tailq_pcb_t *descheduled_entry = stdmem_allocate(sizeof(tailq_pcb_t));
-                        stdmem_copy(&(descheduled_entry->pcb), current_pcb, sizeof(pcb_t));
-                        stdmem_copy(&(descheduled_entry->pcb.ctx), ctx, sizeof(ctx_t));
+                        copy_pcb(&(descheduled_entry->pcb), current_pcb);
+                        copy_ctx(&(descheduled_entry->pcb.ctx), ctx);
                         // Mark the descheduled process as ready (but only if it isn't blocked)
                         if (descheduled_entry->pcb.status == PROCESS_STATUS_RUNNING) {
                                 descheduled_entry->pcb.status = PROCESS_STATUS_READY;
@@ -46,17 +46,16 @@ void scheduler_run(ctx_t* ctx) {
 
                 // If there is a process waiting to execute
                 if (!TAILQ_EMPTY(&head)) {
-                        if (!current_pcb) {
+                        if (current_pcb  == NULL) {
                                 current_pcb = stdmem_allocate(sizeof(pcb_t));
                         }
                         // Get a pointer to the first waiting process, copy its details
                         // into current, remove from queue then store the current context into ctx
-                        tailq_pcb_t *next_p = TAILQ_FIRST(&head);
-                        stdmem_copy(current_pcb, &(next_p->pcb), sizeof(pcb_t));
-                        stdmem_copy(&(current_pcb->ctx), &(next_p->pcb.ctx), sizeof(ctx_t));
+                        tailq_pcb_t* next_p = TAILQ_FIRST(&head);
+                        copy_pcb(current_pcb, &(next_p->pcb));
                         TAILQ_REMOVE(&head, next_p, entries);
                         stdmem_free(next_p);
-                        stdmem_copy(ctx, &(current_pcb->ctx), sizeof(ctx_t));
+                        copy_ctx(ctx, &(current_pcb->ctx));
 
                 } else {
                         current_pcb = NULL;
@@ -96,11 +95,11 @@ void scheduler_exit(ctx_t* ctx) {
                 // Schedule the next process from the queue. Do not re-add the
                 // current process to the queue
                 tailq_pcb_t *p = TAILQ_FIRST(&head);
-                stdmem_copy(&(current_pcb->ctx), &(p->pcb.ctx), sizeof(ctx_t));
+                copy_ctx(&(current_pcb->ctx), &(p->pcb.ctx));
                 current_pcb->pid = p->pcb.pid;
                 TAILQ_REMOVE(&head, p, entries);
                 stdmem_free(p);
-                stdmem_copy(ctx, &(current_pcb->ctx), sizeof(ctx_t));
+                copy_ctx(ctx, &(current_pcb->ctx));
 
                 scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, exited_pid});
         }
@@ -141,8 +140,8 @@ pid_t scheduler_fork(ctx_t* ctx) {
                 // Allocate a new entry in the scheduler queue, setting a new PID
                 // and stack pointer
                 tailq_pcb_t *new_process = stdmem_allocate(sizeof(tailq_pcb_t));
+                copy_pcb(&(new_process->pcb), current_pcb);
                 new_process->pcb.pid = next_pid++;
-                stdmem_copy(&(new_process->pcb.ctx), &(current_pcb->ctx), sizeof(ctx_t));
                 new_process->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
                 new_process->pcb.ctx.gpr[0] = 0; // The child process should receive 0 from the fork call
 
@@ -211,10 +210,31 @@ void scheduler_initialise(ctx_t* ctx) {
         sh->pcb.ctx.cpsr = 0x50;
         sh->pcb.ctx.pc = (uint32_t)(entry_sh);
         sh->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
+        sh->pcb.status = PROCESS_STATUS_RUNNING;
 
         TAILQ_INSERT_TAIL(&head, sh, entries);
 
         scheduler_run(ctx);
 
         return;
+}
+
+void copy_pcb(pcb_t* destination, pcb_t* source) {
+        destination->pid = source->pid;
+        destination->status = source->status;
+        copy_ctx(&destination->ctx, &source->ctx);
+        copy_event(&destination->blocked_until, &source->blocked_until);
+}
+
+void copy_ctx(ctx_t* destination, ctx_t* source) {
+        destination->cpsr = source->cpsr;
+        stdmem_copy(&destination->gpr, &source->gpr, sizeof(uint32_t)*13);
+        destination->lr = source->lr;
+        destination->pc = source->pc;
+        destination->sp = source->sp;
+}
+
+void copy_event(event_t* destination, event_t* source) {
+        destination->event = source->event;
+        destination->from_process = source->from_process;
 }

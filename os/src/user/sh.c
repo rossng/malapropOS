@@ -4,6 +4,7 @@
 #include "P0.h"
 #include "P1.h"
 #include "syscall.h"
+#include "../device/PL011.h"
 
 void mush() {
         char* last_line = stdmem_allocate(101);
@@ -17,14 +18,16 @@ void mush() {
                         stdio_printchar(last_char);
                 }
                 stdio_printchar('\n');
-                if (stdstr_compare(last_line, "P1") == 0) {
+                if (stdstr_compare(last_line, "P1\r") == 0) {
                         pid_t child_pid = _fork();
                         int32_t status;
                         if (child_pid == 0) {
                                 // If this is the child process, exec the new process
+                                PL011_puts(UART0, "mush: child\n", 12);
                                 _exec(entry_P0);
                         } else {
                                 // Otherwise, wait for the child to complete
+                                PL011_puts(UART0, "mush: parent\n", 13);
                                 _waitpid(PROCESS_EVENT_EXITED, child_pid);
                         }
                 }
