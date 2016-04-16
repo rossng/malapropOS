@@ -6,7 +6,7 @@
 #include "syscall.h"
 #include "../device/PL011.h"
 
-
+// See http://brennan.io/2015/01/16/write-a-shell-in-c/ for more info on basic shell implementation
 void launch_process(void (*function)()) {
         pid_t child_pid = _fork();
         int32_t status;

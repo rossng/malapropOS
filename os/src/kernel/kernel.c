@@ -6,11 +6,14 @@
 #include "irq.h"
 #include "scheduler.h"
 #include "file.h"
+#include "io.h"
 
 void kernel_handler_rst(ctx_t* ctx) {
         PL011_puts(UART0, "Starting MalapropOS\n", 20);
 
         scheduler_initialise(ctx);
+
+        initialise_buffers();
 
         PL011_puts(UART0, "Configuring Timer\n", 18);
 
@@ -47,20 +50,17 @@ void kernel_handler_irq(ctx_t* ctx) {
 
         // Step 4: handle the interrupt, then clear (or reset) the source.
 
-        if (id == GIC_SOURCE_TIMER0) {
-                scheduler_run(ctx);
-                TIMER0->Timer1IntClr = 0x01;
+        switch (id) {
+                case GIC_SOURCE_TIMER0:
+                        scheduler_run(ctx);
+                        TIMER0->Timer1IntClr = 0x01;
+                        break;
+                case GIC_SOURCE_UART0:
+                        char c = PL011_getc(UART0);
+                        buffer_char(STDIN_FILEDESC, c);
+                        UART0->ICR = 0x10;
+                        break;
         }
-
-        /*else if (id == GIC_SOURCE_UART0) {
-                uint8_t x = PL011_getc(UART0);
-
-                PL011_puts(UART0, "Received: ", 10);
-                PL011_putc(UART0,  x);
-                PL011_putc(UART0, '\n');
-
-                UART0->ICR = 0x10;
-        }*/
 
         // Step 5: write the interrupt identifier to signal we're done.
 
