@@ -31,6 +31,6 @@ build       : ${MLIBC_TARGETS}
 process     : ${MLIBC_PROCESSED}
 
 clean :
-	@rm -f core ${MLIBC_OBJECTS} build/libc.a
+	@rm -f core ${MLIBC_OBJECTS} ${MLIBC_PROCESSED} build/libc.a
 
 print-%  : ; @echo $* = $($*)
