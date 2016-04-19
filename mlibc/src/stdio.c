@@ -40,7 +40,9 @@ size_t stdio_readline(char* buf, size_t nbytes) {
 }
 
 char stdio_readchar() {
-        char c;
-        _read(STDIN_FILEDESC, &c, 1);
+        char c = EOF;
+        do {
+                _read(STDIN_FILEDESC, &c, 1);
+        } while (c == EOF);
         return c;
 }

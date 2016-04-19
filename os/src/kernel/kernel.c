@@ -6,14 +6,13 @@
 #include "irq.h"
 #include "scheduler.h"
 #include "file.h"
-#include "io.h"
 
 void kernel_handler_rst(ctx_t* ctx) {
         PL011_puts(UART0, "Starting MalapropOS\n", 20);
 
         scheduler_initialise(ctx);
 
-        initialise_buffers();
+        file_initialise();
 
         PL011_puts(UART0, "Configuring Timer\n", 18);
 
@@ -25,13 +24,13 @@ void kernel_handler_rst(ctx_t* ctx) {
 
         PL011_puts(UART0, "Configuring UART\n", 17);
 
-        //UART0->IMSC |= 0x00000010; // enable UART    (Rx) interrupt
+        UART0->IMSC |= 0x00000010; // enable UART    (Rx) interrupt
         UART0->CR = 0x00000301; // enable UART (Tx+Rx)
 
         PL011_puts(UART0, "Configuring Interrupt Controller\n", 33);
 
         GICC0->PMR = 0x000000F0; // unmask all interrupts
-        GICD0->ISENABLER[1] |= 0x00000010; // enable Timer 0 interrupt (see 4-65 RealView PB Cortex-A8 Guide)
+        GICD0->ISENABLER[1] |= 0x00001010; // enable Timer 0 interrupt (see 4-65 RealView PB Cortex-A8 Guide)
         GICC0->CTLR = 0x00000001; // enable GIC interface
         GICD0->CTLR = 0x00000001; // enable GIC distributor
 
@@ -51,19 +50,20 @@ void kernel_handler_irq(ctx_t* ctx) {
         // Step 4: handle the interrupt, then clear (or reset) the source.
 
         switch (id) {
-                case GIC_SOURCE_TIMER0:
+                case GIC_SOURCE_TIMER0: {
                         scheduler_run(ctx);
                         TIMER0->Timer1IntClr = 0x01;
                         break;
-                case GIC_SOURCE_UART0:
+                }
+                case GIC_SOURCE_UART0: {
                         char c = PL011_getc(UART0);
-                        buffer_char(STDIN_FILEDESC, c);
+                        stdstream_push_char(stdin_buffer, c);
                         UART0->ICR = 0x10;
                         break;
+                }
         }
 
         // Step 5: write the interrupt identifier to signal we're done.
-
         GICC0->EOIR = id;
 }
 

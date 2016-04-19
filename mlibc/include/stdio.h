@@ -2,6 +2,7 @@
 #define STDIO_H_
 
 #include <stdtypes.h>
+#include <stddef.h>
 #include <stdstr.h>
 
 #define STDIN_FILEDESC 0
