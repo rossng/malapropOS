@@ -13,6 +13,7 @@ MalapropOS has a custom libc called `mlibc`. The implementation of TAILQ is from
 * Pre-emptive multi-tasking with a fixed process list and fixed timeslices
 * Dynamic creation and destruction of process with `fork()` and `exit()`
 * A very basic interactive shell, `mμsh`
+* Buffered input, support for `Ctrl+C` in the shell
 
 ### Planned
 
