@@ -27,12 +27,18 @@ typedef struct tailq_pcb_s {
         TAILQ_ENTRY(tailq_pcb_s) entries;
 } tailq_pcb_t;
 
+typedef struct tailq_event_s {
+        event_t event;
+        TAILQ_ENTRY(tailq_event_s) entries;
+} tailq_event_t;
+
 void scheduler_initialise(ctx_t* ctx);
 void scheduler_run(ctx_t* ctx);
 void scheduler_exit(ctx_t* ctx);
 pid_t scheduler_fork(ctx_t* ctx);
 pid_t scheduler_getpid(ctx_t* ctx);
-void scheduler_block_process(ctx_t* ctx, event_t until_event);
+pid_t scheduler_block_process(ctx_t* ctx, event_t until_event);
+pid_t scheduler_has_event_occurred(ctx_t* ctx, event_t event);
 pid_t scheduler_new_process(ctx_t* ctx, void (*function)());
 void scheduler_emit_event(event_t event);
 pid_t scheduler_exec(ctx_t* ctx, void (*function)());

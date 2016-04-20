@@ -8,14 +8,24 @@
 
 // See http://brennan.io/2015/01/16/write-a-shell-in-c/ for more info on basic shell implementation
 void launch_process(void (*function)()) {
-        pid_t child_pid = _fork();
+        pid_t fork_pid = _fork();
         int32_t status;
-        if (child_pid == 0) {
+        if (fork_pid == 0) {
                 // If this is the child process, exec the new process
                 _exec(entry_P0);
         } else {
                 // Otherwise, wait for the child to complete
-                _waitpid(PROCESS_EVENT_EXITED, child_pid);
+                pid_t child_pid = fork_pid;
+                pid_t result = 0;
+                bool waiting = 1;
+                do {
+                        result = _waitpid(PROCESS_EVENT_EXITED, child_pid, WAITPID_NOHANG);
+                        if (!result) {
+                                _yield();
+                        } else {
+                                waiting = 0;
+                        }
+                } while (waiting);
         }
 }
 

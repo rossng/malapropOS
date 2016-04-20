@@ -5,9 +5,11 @@
 
 void P0() {
         while (1) {
-                stdio_print("P0\n");
-                for (int i = 0; i < 0x5000000; i++) {
-                        asm volatile("nop");
+                for (int i = 0; i < 5; i++) {
+                        stdio_print("P0\n");
+                        for (int i = 0; i < 0x5000000; i++) {
+                                asm volatile("nop");
+                        }
                 }
                 stdproc_exit(EXIT_SUCCESS);
         }

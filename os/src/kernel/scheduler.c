@@ -9,10 +9,11 @@
 
 pcb_t pcb[2];
 pcb_t *current_pcb = NULL;
-pid_t next_pid = 0;
+pid_t next_pid = 1;
 void* current_stack_break = &stack_top_usr;
 
-TAILQ_HEAD(tailqhead, tailq_pcb_s) head;
+TAILQ_HEAD(tailq_pcb_head_t, tailq_pcb_s) head;
+TAILQ_HEAD(tailq_event_head_t, tailq_event_s) events_head;
 
 /**
  * Like sbrk but for the stack.
@@ -71,13 +72,29 @@ void scheduler_run(ctx_t* ctx) {
 /**
  * Block a process until a certain event.
  */
-void scheduler_block_process(ctx_t* ctx, event_t until_event) {
+pid_t scheduler_block_process(ctx_t* ctx, event_t until_event) {
         // Mark the process as blocked
         current_pcb->blocked_until = until_event;
         current_pcb->status = PROCESS_STATUS_BLOCKED;
         scheduler_emit_event((event_t){PROCESS_EVENT_BLOCKED, current_pcb->pid});
         // Deschedule
         scheduler_run(ctx);
+
+        return until_event.from_process;
+}
+
+/**
+ * Check the record to see if an event has occurred.
+ */
+pid_t scheduler_has_event_occurred(ctx_t* ctx, event_t event) {
+        tailq_event_t* item;
+        TAILQ_FOREACH(item, &events_head, entries) {
+                // If the process is blocked
+                if (item->event.event == event.event && item->event.from_process == event.from_process) {
+                        return event.from_process;
+                }
+        }
+        return 0;
 }
 
 /**
@@ -112,6 +129,14 @@ void scheduler_exit(ctx_t* ctx) {
  * Fire the actions associated with a provided process event.
  */
 void scheduler_emit_event(event_t event) {
+        // Record this event in the list of events
+        if (event.event != PROCESS_EVENT_SUSPENDED && event.event != PROCESS_EVENT_UNSUSPENDED) {
+                tailq_event_t *ev = stdmem_allocate(sizeof(tailq_event_t));
+                ev->event.event = event.event;
+                ev->event.from_process = event.from_process;
+                TAILQ_INSERT_TAIL(&events_head, ev, entries);
+        }
+
         tailq_pcb_t* item;
         TAILQ_FOREACH(item, &head, entries) {
                 // If the process is blocked
@@ -215,6 +240,8 @@ void scheduler_initialise(ctx_t* ctx) {
         sh->pcb.status = PROCESS_STATUS_RUNNING;
 
         TAILQ_INSERT_TAIL(&head, sh, entries);
+
+        TAILQ_INIT(&events_head);
 
         scheduler_run(ctx);
 

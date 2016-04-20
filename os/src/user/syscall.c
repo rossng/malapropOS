@@ -93,17 +93,18 @@ pid_t _getpid() {
         return r;
 }
 
-pid_t _waitpid(procevent_t event, pid_t pid) {
+pid_t _waitpid(procevent_t event, pid_t pid, int32_t options) {
         // This isn't quite the same as the traditional waitpid syscall
         pid_t r;
         asm volatile(
                 "mov r0, %1 \n"
                 "mov r1, %2 \n"
+                "mov r2, %3 \n"
                 "svc #7     \n"
                 "mov %0, r0 \n"
                 : "=r" (r)
-                : "r" (event), "r" (pid)
-                : "r0", "r1");
+                : "r" (event), "r" (pid), "r" (options)
+                : "r0", "r1", "r2");
         return r;
 }
 

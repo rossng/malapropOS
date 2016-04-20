@@ -104,10 +104,18 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                 case 7 : { // waitpid
                         procevent_t status = (procevent_t)(ctx->gpr[0]);
                         pid_t pid = (pid_t)(ctx->gpr[1]);
+                        int32_t options = (int32_t)(ctx->gpr[2]);
 
                         event_t until_event = {status, pid};
-                        scheduler_block_process(ctx, until_event);
-                        // Doesn't return
+
+                        pid_t result;
+                        if (options & WAITPID_NOHANG) {
+                                result = scheduler_has_event_occurred(ctx, until_event);
+                        } else {
+                                result = scheduler_block_process(ctx, until_event);
+                        }
+
+                        ctx->gpr[0] = result;
                         break;
                 }
                 case 20 : { // getpid
