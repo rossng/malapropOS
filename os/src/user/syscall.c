@@ -117,3 +117,16 @@ void _exec(void (*function)()) {
                 : "r" (function)
                 : "r0");
 }
+
+int32_t _kill(pid_t pid, int32_t sig) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "svc #37    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (pid), "r" (sig)
+                : "r0", "r1");
+        return r;
+}

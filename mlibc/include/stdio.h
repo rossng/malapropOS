@@ -17,5 +17,6 @@ void stdio_file_print(filedesc_t fd, char* str);
 
 size_t stdio_readline(char* buf, size_t nbytes);
 char stdio_readchar();
+char stdio_readchar_nonblocking();
 
 #endif

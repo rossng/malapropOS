@@ -12,6 +12,7 @@ pid_t _fork(void);
 pid_t _getpid(void);
 pid_t _waitpid(procevent_t event, pid_t pid, int32_t options);
 void _exec(void (*function)());
+int32_t _kill(pid_t pid, int32_t sig);
 
 int32_t _read(int32_t fd, char *buf, size_t nbytes);
 size_t _write(int32_t fd, char *buf, size_t nbytes);

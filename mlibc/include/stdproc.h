@@ -20,6 +20,15 @@
 #define PROCESS_STATUS_BLOCKED 3
 #define PROCESS_STATUS_TERMINATED 4
 
+// Signals
+#define SIGHUP 1
+#define SIGINT 2
+#define SIGQUIT 3
+#define SIGABRT 6
+#define SIGKILL 9
+#define SIGALRM 14
+#define SIGTERM 15
+
 void stdproc_exit(procres_t result);
 pid_t stdproc_fork(void);
 pid_t stdproc_getpid(void);

@@ -6,6 +6,7 @@
 #include "irq.h"
 #include "scheduler.h"
 #include "file.h"
+#include <stdproc.h>
 
 void kernel_handler_rst(ctx_t* ctx) {
         PL011_puts(UART0, "Starting MalapropOS\n", 20);
@@ -120,6 +121,18 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                 }
                 case 20 : { // getpid
                         pid_t result = scheduler_getpid(ctx);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 37 : { // kill
+                        pid_t pid = (pid_t)(ctx->gpr[0]);
+                        int32_t sig = (int32_t)(ctx->gpr[1]);
+
+                        int32_t result;
+                        if (sig == SIGKILL) {
+                                result = scheduler_kill(ctx, pid);
+                        }
 
                         ctx->gpr[0] = result;
                         break;

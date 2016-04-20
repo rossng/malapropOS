@@ -124,6 +124,21 @@ void scheduler_exit(ctx_t* ctx) {
         return;
 }
 
+/**
+ * Kill the specified process.
+ */
+int32_t scheduler_kill(ctx_t* ctx, pid_t pid) {
+        tailq_pcb_t* item;
+        TAILQ_FOREACH(item, &head, entries) {
+                // If the process matches the pid, remove it
+                if (item->pcb.pid == pid) {
+                        item->pcb.status = PROCESS_STATUS_TERMINATED;
+                        scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, pid});
+                }
+        }
+        return 0;
+}
+
 
 /**
  * Fire the actions associated with a provided process event.

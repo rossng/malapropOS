@@ -46,3 +46,9 @@ char stdio_readchar() {
         } while (c == EOF);
         return c;
 }
+
+char stdio_readchar_nonblocking() {
+        char c = EOF;
+        _read(STDIN_FILEDESC, &c, 1);
+        return c;
+}

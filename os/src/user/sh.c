@@ -5,6 +5,33 @@
 #include "P1.h"
 #include "syscall.h"
 #include "../device/PL011.h"
+#include <stdstream.h>
+
+struct tailq_stream_head* sh_stdin_buffer;
+
+void handle_input(pid_t child_pid) {
+        char c = EOF;
+        do {
+                c = stdio_readchar_nonblocking();
+                if (c == 3) { // Ctrl+C
+                        // Normally we send SIGINT on Ctrl+C, but at the moment
+                        // we don't care about letting the child process handle
+                        // the signal - just kill it with the scheduler
+                        _kill(child_pid, SIGKILL);
+                }
+                if (c != EOF) {
+                        stdstream_push_char(sh_stdin_buffer, c);
+                }
+        } while (c != EOF);
+}
+
+char get_next_char() {
+        char c = stdstream_pop_char(sh_stdin_buffer);
+        if (c == EOF) {
+                c = stdio_readchar();
+        }
+        return c;
+}
 
 // See http://brennan.io/2015/01/16/write-a-shell-in-c/ for more info on basic shell implementation
 void launch_process(void (*function)()) {
@@ -21,6 +48,7 @@ void launch_process(void (*function)()) {
                 do {
                         result = _waitpid(PROCESS_EVENT_EXITED, child_pid, WAITPID_NOHANG);
                         if (!result) {
+                                handle_input(child_pid);
                                 _yield();
                         } else {
                                 waiting = 0;
@@ -75,8 +103,8 @@ void line_backspace(shell_line_t* line) {
 }
 
 void line_control_seq(shell_line_t* line) {
-        char next = stdio_readchar();
-        char after_next = stdio_readchar();
+        char next = get_next_char();
+        char after_next = get_next_char();
         if (next != '[') {
                 line_insert(line, '^');
                 line_insert(line, next);
@@ -113,18 +141,21 @@ void get_line(char* buf, size_t nbytes) {
         shell_line_t line = make_line("mush> ", 6, stdmem_allocate(101), 100);
         line_print(&line);
 
-        char c = stdio_readchar();
+        char c = get_next_char();
         while (c != '\r') {
-                // Backspace has some weird legacy mapping: http://www.ibb.net/%7Eanne/keyboard/keyboard.html
-                if (c == 'b' || c == 0x7f) {
+                if (c == 3) {                           // Ctrl+C
+                        buf[0] = '\0';
+                        return;
+                } else if (c == 'b' || c == 0x7f) {     // Backspace
+                        // Backspace has some weird legacy mapping: http://www.ibb.net/%7Eanne/keyboard/keyboard.html
                         line_backspace(&line);
-                } else if (c == 27) {
+                } else if (c == 27) {                   // Start of a control sequence
                         line_control_seq(&line);
-                } else {
+                } else {                                // Any other character
                         line_insert(&line, c);
                 }
                 line_print(&line);
-                c = stdio_readchar();
+                c = get_next_char();
         }
 
         line_print_with_newline(&line);
@@ -134,6 +165,7 @@ void get_line(char* buf, size_t nbytes) {
 }
 
 void mush() {
+        sh_stdin_buffer = stdstream_initialise_buffer();
         char* last_line = stdmem_allocate(101);
         stdio_print("Welcome to the mu shell\n");
         while (1) {
@@ -142,7 +174,11 @@ void mush() {
                         _exit(EXIT_SUCCESS);
                 } else if (stdstr_compare(last_line, "P0") == 0) {
                         launch_process(entry_P0);
-                }
+                } else if (stdstr_length(last_line) == 0) {
+                        continue;
+                } else {
+                        stdio_print("Command not recognised\n");
+                };
         }
 }
 
