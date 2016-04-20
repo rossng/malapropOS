@@ -4,20 +4,19 @@
 #include <stdio.h>
 #include <stdproc.h>
 
+pid_t num_launches = 0;
+
 void P1() {
-        pid_t new_pid;
-        if (stdproc_getpid() == 1) {
-                new_pid = stdproc_fork();
-        }
         while (1) {
-                if (stdproc_getpid() == 1) {
-                        stdio_print("P1\n");
-                } else {
-                        stdio_print("Not P1\n");
+                for (int i = 0; i < 5; i++) {
+                        stdio_print("P1: ");
+                        stdio_printint(i);
+                        stdio_print("\n");
+                        for (int i = 0; i < 0x5000000; i++) {
+                                asm volatile("nop");
+                        }
                 }
-                for (int i = 0; i < 0x5000000; i++) {
-                        asm volatile("nop");
-                }
+                stdproc_exit(EXIT_SUCCESS);
         }
 }
 

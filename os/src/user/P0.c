@@ -6,7 +6,9 @@
 void P0() {
         while (1) {
                 for (int i = 0; i < 5; i++) {
-                        stdio_print("P0\n");
+                        stdio_print("P0: ");
+                        stdio_printint(i);
+                        stdio_print("\n");
                         for (int i = 0; i < 0x5000000; i++) {
                                 asm volatile("nop");
                         }

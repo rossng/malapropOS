@@ -39,7 +39,7 @@ void launch_process(void (*function)()) {
         int32_t status;
         if (fork_pid == 0) {
                 // If this is the child process, exec the new process
-                _exec(entry_P0);
+                _exec(function);
         } else {
                 // Otherwise, wait for the child to complete
                 pid_t child_pid = fork_pid;
@@ -174,6 +174,8 @@ void mush() {
                         _exit(EXIT_SUCCESS);
                 } else if (stdstr_compare(last_line, "P0") == 0) {
                         launch_process(entry_P0);
+                } else if (stdstr_compare(last_line, "P1") == 0) {
+                        launch_process(entry_P1);
                 } else if (stdstr_length(last_line) == 0) {
                         continue;
                 } else {
