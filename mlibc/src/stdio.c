@@ -2,7 +2,8 @@
 #include <syscall.h>
 
 void stdio_print(char* str) {
-        _write(STDOUT_FILEDESC, str, stdstr_length(str));
+        int32_t len = stdstr_length(str);
+        _write(STDOUT_FILEDESC, str, len);
 }
 
 void stdio_printchar(char c) {

@@ -31,7 +31,8 @@ void kernel_handler_rst(ctx_t* ctx) {
         PL011_puts(UART0, "Configuring Interrupt Controller\n", 33);
 
         GICC0->PMR = 0x000000F0; // unmask all interrupts
-        GICD0->ISENABLER[1] |= 0x00001010; // enable Timer 0 interrupt (see 4-65 RealView PB Cortex-A8 Guide)
+        GICD0->ISENABLER[1] |= 0x00001000; // enable UART 0 interrupt
+        GICD0->ISENABLER[1] |= 0x00000010; // enable Timer 0 interrupt (see 4-65 RealView PB Cortex-A8 Guide)
         GICC0->CTLR = 0x00000001; // enable GIC interface
         GICD0->CTLR = 0x00000001; // enable GIC distributor
 
@@ -133,6 +134,16 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         if (sig == SIGKILL) {
                                 result = scheduler_kill(ctx, pid);
                         }
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 97 : { // setpriority
+                        pid_t which = (pid_t)(ctx->gpr[0]);
+                        pid_t who = (pid_t)(ctx->gpr[1]);
+                        int32_t priority = (int32_t)(ctx->gpr[2]);
+
+                        int32_t result = scheduler_setpriority(ctx, which, priority);
 
                         ctx->gpr[0] = result;
                         break;

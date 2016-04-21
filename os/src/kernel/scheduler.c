@@ -7,13 +7,17 @@
 
 #include <stdmem.h>
 
-pcb_t pcb[2];
-pcb_t *current_pcb = NULL;
+pid_t current_pid = NULL;
 pid_t next_pid = 1;
 void* current_stack_break = &stack_top_usr;
 
-TAILQ_HEAD(tailq_pcb_head_t, tailq_pcb_s) head;
+TAILQ_HEAD(tailq_pcb_head_t, tailq_pcb_s);
+TAILQ_HEAD(tailq_pid_head_t, tailq_pid_s);
 TAILQ_HEAD(tailq_event_head_t, tailq_event_s) events_head;
+
+struct tailq_pcb_head_t process_list;
+struct tailq_pid_head_t low_priority_queue_head;
+struct tailq_pid_head_t high_priority_queue_head;
 
 /**
  * Like sbrk but for the stack.
@@ -24,47 +28,143 @@ void* set_stack_break(int32_t increment) {
         return old_stack_break;
 }
 
+pid_t get_new_pid() {
+        pid_t pid = next_pid;
+        next_pid++;
+        return pid;
+}
+
+/**
+ * Find a process in the process list by its PID
+ */
+pcb_t* find_process(pid_t pid) {
+        tailq_pcb_t* item;
+        TAILQ_FOREACH(item, &process_list, entries) {
+                if (item->pcb.pid == pid) {
+                        return &(item->pcb);
+                }
+        }
+        return NULL;
+}
+
+/**
+ * Save the details of the current process to the process list.
+ */
+void save_current_process(ctx_t* ctx) {
+        // Retrieve the saved state of the current process
+        pcb_t* current_process = find_process(current_pid);
+        // Update it with the current context
+        copy_ctx(&(current_process->ctx), ctx);
+}
+
+/**
+ * Schedule a process by its PID.
+ */
+void run_process(ctx_t* ctx, pid_t pid) {
+        // Retrieve the saved details of the specified process
+        pcb_t* to_schedule = find_process(pid);
+        // Copy them into the context
+        copy_ctx(ctx, &(to_schedule->ctx));
+        // And update the current pid
+        current_pid = pid;
+}
+
+/**
+ * Remove a PID from the specified priority queue
+ */
+void remove_pid(pid_t pid, int32_t priority) {
+        tailq_pid_t* item;
+        switch (priority) {
+                case 0 : {
+                        TAILQ_FOREACH(item, &high_priority_queue_head, entries) {
+                                if (item->pid == pid) {
+                                        TAILQ_REMOVE(&high_priority_queue_head, item, entries);
+                                }
+                        }
+                }
+                case 1 : {
+                        TAILQ_FOREACH(item, &low_priority_queue_head, entries) {
+                                if (item->pid == pid) {
+                                        TAILQ_REMOVE(&low_priority_queue_head, item, entries);
+                                }
+                        }
+                }
+        }
+}
+
+/**
+ * Add a PID to the specified priority queue
+ */
+void add_pid(pid_t pid, int32_t priority) {
+        tailq_pid_t *new_pid = stdmem_allocate(sizeof(tailq_pid_t));
+        new_pid->pid = pid;
+
+        switch (priority) {
+                case 0 : {
+                        TAILQ_INSERT_TAIL(&high_priority_queue_head, new_pid, entries);
+                }
+                case 1 : {
+                        TAILQ_INSERT_TAIL(&low_priority_queue_head, new_pid, entries);
+                }
+        }
+
+}
+
+/**
+ * Set the priority of a process
+ */
+void set_priority(pid_t pid, int32_t priority) {
+        remove_pid(pid, priority);
+        add_pid(pid, priority);
+}
+
+/**
+ * Get the PID of the next process in the specified priority queue
+ * @return -1 if the high priority queue is empty
+ */
+pid_t get_next_process(int32_t priority) {
+        struct tailq_pid_head_t* priority_queue_head;
+
+        switch (priority) {
+                case 0 : {
+                        priority_queue_head = &high_priority_queue_head;
+                        break;
+                }
+                case 1 : {
+                        priority_queue_head = &low_priority_queue_head;
+                        break;
+                }
+                default : {
+                        return -1;
+                }
+
+        }
+
+        tailq_pid_t* next_pid_item;
+
+        // Move the first item in the queue to the back and return its PID
+        if (TAILQ_EMPTY(priority_queue_head)) {
+                return -1;
+        }
+        next_pid_item = TAILQ_FIRST(priority_queue_head);
+        TAILQ_REMOVE(priority_queue_head, next_pid_item, entries);
+        TAILQ_INSERT_TAIL(priority_queue_head, next_pid_item, entries);
+        return next_pid_item->pid;
+}
+
 /**
  * Given the current process context, switch to the other process.
  */
 void scheduler_run(ctx_t* ctx) {
+        pid_t next_proc_pid = get_next_process(0);
 
-        do {
-                // If there is a process currently executing
-                if (current_pcb) {
-                        // Allocate a new queue entry, store the process details into it
-                        // and then add it to the back of the queue
-                        tailq_pcb_t *descheduled_entry = stdmem_allocate(sizeof(tailq_pcb_t));
-                        copy_pcb(&(descheduled_entry->pcb), current_pcb);
-                        copy_ctx(&(descheduled_entry->pcb.ctx), ctx);
-                        // Mark the descheduled process as ready (but only if it isn't blocked)
-                        if (descheduled_entry->pcb.status == PROCESS_STATUS_RUNNING) {
-                                descheduled_entry->pcb.status = PROCESS_STATUS_READY;
-                                scheduler_emit_event((event_t){PROCESS_EVENT_SUSPENDED, descheduled_entry->pcb.pid});
-                        }
-                        TAILQ_INSERT_TAIL(&head, descheduled_entry, entries);
-                }
+        if (next_proc_pid == -1) {
+                next_proc_pid = get_next_process(1);
+        }
 
-                // If there is a process waiting to execute
-                if (!TAILQ_EMPTY(&head)) {
-                        if (current_pcb  == NULL) {
-                                current_pcb = stdmem_allocate(sizeof(pcb_t));
-                        }
-                        // Get a pointer to the first waiting process, copy its details
-                        // into current, remove from queue then store the current context into ctx
-                        tailq_pcb_t* next_p = TAILQ_FIRST(&head);
-                        copy_pcb(current_pcb, &(next_p->pcb));
-                        TAILQ_REMOVE(&head, next_p, entries);
-                        stdmem_free(next_p);
-                        copy_ctx(ctx, &(current_pcb->ctx));
+        save_current_process(ctx);
 
-                } else {
-                        current_pcb = NULL;
-                }
-        } while (current_pcb->status != PROCESS_STATUS_READY);
-
-        current_pcb->status = PROCESS_STATUS_RUNNING;
-        scheduler_emit_event((event_t){PROCESS_EVENT_UNSUSPENDED, current_pcb->pid});
+        run_process(ctx, next_proc_pid);
 
         return;
 }
@@ -73,11 +173,19 @@ void scheduler_run(ctx_t* ctx) {
  * Block a process until a certain event.
  */
 pid_t scheduler_block_process(ctx_t* ctx, event_t until_event) {
-        // Mark the process as blocked
-        current_pcb->blocked_until = until_event;
-        current_pcb->status = PROCESS_STATUS_BLOCKED;
-        scheduler_emit_event((event_t){PROCESS_EVENT_BLOCKED, current_pcb->pid});
-        // Deschedule
+        // Save the current process state and mark it as blocked
+        save_current_process(ctx);
+        pcb_t* current_process = find_process(current_pid);
+        current_process->blocked_until = until_event;
+        current_process->status = PROCESS_STATUS_BLOCKED;
+
+        // Remove the current process from all priority queues
+        remove_pid(current_pid, 0);
+        remove_pid(current_pid, 1);
+
+        scheduler_emit_event((event_t){PROCESS_EVENT_BLOCKED, current_pid});
+
+        // Find another process to schedule
         scheduler_run(ctx);
 
         return until_event.from_process;
@@ -101,24 +209,24 @@ pid_t scheduler_has_event_occurred(ctx_t* ctx, event_t event) {
  * Terminate the current process.
  */
 void scheduler_exit(ctx_t* ctx) {
-        if (TAILQ_EMPTY(&head)) {
-                PL011_puts(UART0, "Scheduler: cannot exit last remaining process\n", 46);
-        } else if (!current_pcb) {
-                PL011_puts(UART0, "Scheduler: no process currently executing\n", 42);
-        } else {
-                //PL011_puts(UART0, "Scheduler: exiting\n", 19);
-                pid_t exited_pid = current_pcb->pid;
+        // Save the current pid
+        pid_t exited_pid = current_pid;
 
-                // Schedule the next process from the queue. Do not re-add the
-                // current process to the queue
-                tailq_pcb_t *p = TAILQ_FIRST(&head);
-                copy_ctx(&(current_pcb->ctx), &(p->pcb.ctx));
-                current_pcb->pid = p->pcb.pid;
-                TAILQ_REMOVE(&head, p, entries);
-                stdmem_free(p);
-                copy_ctx(ctx, &(current_pcb->ctx));
+        // Remove the current process from all priority queues
+        remove_pid(current_pid, 0);
+        remove_pid(current_pid, 1);
 
+        // And ask the scheduler to run something else
+        scheduler_run(ctx);
+
+        // If the new current pid is different, we have exited and can mark the process
+        // terminated. If not, we have failed to exit and print an error message
+        if (current_pid != exited_pid) {
+                pcb_t* exited_process = find_process(exited_pid);
+                exited_process->status = PROCESS_STATUS_TERMINATED;
                 scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, exited_pid});
+        } else {
+                PL011_puts(UART0, "Scheduler: cannot exit last remaining process\n", 46);
         }
 
         return;
@@ -128,14 +236,16 @@ void scheduler_exit(ctx_t* ctx) {
  * Kill the specified process.
  */
 int32_t scheduler_kill(ctx_t* ctx, pid_t pid) {
-        tailq_pcb_t* item;
-        TAILQ_FOREACH(item, &head, entries) {
-                // If the process matches the pid, remove it
-                if (item->pcb.pid == pid) {
-                        item->pcb.status = PROCESS_STATUS_TERMINATED;
-                        scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, pid});
-                }
-        }
+        // Remove the specified process from all priority queues
+        remove_pid(pid, 0);
+        remove_pid(pid, 1);
+
+        // And ask the scheduler to run something else
+        scheduler_run(ctx);
+
+        // Notify the world
+        scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, pid});
+
         return 0;
 }
 
@@ -153,7 +263,7 @@ void scheduler_emit_event(event_t event) {
         }
 
         tailq_pcb_t* item;
-        TAILQ_FOREACH(item, &head, entries) {
+        TAILQ_FOREACH(item, &process_list, entries) {
                 // If the process is blocked
                 if (item->pcb.status == PROCESS_STATUS_BLOCKED) {
                         // And it is blocked until this event
@@ -162,9 +272,21 @@ void scheduler_emit_event(event_t event) {
                                 item->pcb.status = PROCESS_STATUS_RUNNING;
                                 // Set the return value of _waitpid to the pid of the event process
                                 item->pcb.ctx.gpr[0] = event.from_process;
+                                // Re-add the process to a priority queue (low for simplicity)
+                                set_priority(item->pcb.pid, 1);
                         }
                 }
         }
+}
+
+/**
+ * Set the priority of the specified process.
+ * 0 = high, 1 = low
+ * @return 0 = success, -1 = error
+ */
+int32_t scheduler_setpriority(ctx_t* ctx, pid_t pid, int32_t priority) {
+        set_priority(pid, priority);
+        return 0;
 }
 
 /**
@@ -172,23 +294,24 @@ void scheduler_emit_event(event_t event) {
  * @return the new PID if fork is successful, -1 if forking fails
  */
 pid_t scheduler_fork(ctx_t* ctx) {
-        if (!current_pcb) {
+        if (current_pid < 1) {
                 PL011_puts(UART0, "Scheduler: no process currently executing\n", 42);
         } else {
-                //PL011_puts(UART0, "Scheduler: forking\n", 19);
-
-                // Allocate a new entry in the scheduler queue, setting a new PID
+                // Allocate a new entry in the process list, setting a new PID
                 // and stack pointer
                 tailq_pcb_t *new_process = stdmem_allocate(sizeof(tailq_pcb_t));
-                copy_pcb(&(new_process->pcb), current_pcb);
+                pid_t new_pid = get_new_pid();
+                copy_pcb(&(new_process->pcb), find_process(current_pid));
                 copy_ctx(&(new_process->pcb.ctx), ctx);
-                new_process->pcb.pid = next_pid++;
+                new_process->pcb.pid = new_pid;
                 new_process->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
                 new_process->pcb.status = PROCESS_STATUS_READY;
                 new_process->pcb.ctx.gpr[0] = 0; // The child process should receive 0 from the fork call
 
-                TAILQ_INSERT_TAIL(&head, new_process, entries);
+                TAILQ_INSERT_TAIL(&process_list, new_process, entries);
 
+                // Now queue the new process
+                set_priority(new_pid, 1);
                 scheduler_emit_event((event_t){PROCESS_EVENT_CREATED, new_process->pcb.pid});
 
                 return new_process->pcb.pid;
@@ -202,30 +325,7 @@ pid_t scheduler_fork(ctx_t* ctx) {
  * @return the PID of the current process, -1 if there is no current process.
  */
 pid_t scheduler_getpid(ctx_t* ctx) {
-        if (!current_pcb) {
-                return -1;
-        } else {
-                return current_pcb->pid;
-        }
-}
-
-/**
- * Create a new process from the function provided.
- * @return the pid of the new process
- */
-pid_t scheduler_new_process(ctx_t* ctx, void (*function)()) {
-        tailq_pcb_t *new_proc = stdmem_allocate(sizeof(tailq_pcb_t));
-        new_proc->pcb.pid = next_pid++;
-        new_proc->pcb.ctx.cpsr = 0x50;
-        new_proc->pcb.ctx.pc = (uint32_t)(function);
-        new_proc->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
-        new_proc->pcb.status = PROCESS_STATUS_RUNNING;
-
-        TAILQ_INSERT_TAIL(&head, new_proc, entries);
-
-        scheduler_emit_event((event_t){PROCESS_EVENT_CREATED, new_proc->pcb.pid});
-
-        return new_proc->pcb.pid;
+        return current_pid;
 }
 
 /**
@@ -235,9 +335,10 @@ pid_t scheduler_new_process(ctx_t* ctx, void (*function)()) {
 pid_t scheduler_exec(ctx_t* ctx, void (*function)()) {
         ctx->pc = (uint32_t)(function);
         ctx->sp = (uint32_t)(set_stack_break(1000));
-        current_pcb->status = PROCESS_STATUS_RUNNING;
+        pcb_t* current_process = find_process(current_pid);
+        current_process->status = PROCESS_STATUS_RUNNING;
 
-        return current_pcb->pid;
+        return current_pid;
 }
 
 /**
@@ -245,20 +346,26 @@ pid_t scheduler_exec(ctx_t* ctx, void (*function)()) {
  * into the provided location.
  */
 void scheduler_initialise(ctx_t* ctx) {
-        TAILQ_INIT(&head);
+        TAILQ_INIT(&low_priority_queue_head);
+        TAILQ_INIT(&high_priority_queue_head);
+        TAILQ_INIT(&events_head);
+        TAILQ_INIT(&process_list);
+
+        pid_t new_pid = get_new_pid();
 
         tailq_pcb_t *sh = stdmem_allocate(sizeof(tailq_pcb_t));
-        sh->pcb.pid = next_pid++;
+        sh->pcb.pid = new_pid;
         sh->pcb.ctx.cpsr = 0x50;
         sh->pcb.ctx.pc = (uint32_t)(entry_sh);
         sh->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
         sh->pcb.status = PROCESS_STATUS_RUNNING;
+        TAILQ_INSERT_TAIL(&process_list, sh, entries);
 
-        TAILQ_INSERT_TAIL(&head, sh, entries);
+        tailq_pid_t *sh_pid = stdmem_allocate(sizeof(tailq_pid_t));
+        sh_pid->pid = new_pid;
+        TAILQ_INSERT_TAIL(&low_priority_queue_head, sh_pid, entries);
 
-        TAILQ_INIT(&events_head);
-
-        scheduler_run(ctx);
+        run_process(ctx, new_pid);
 
         return;
 }

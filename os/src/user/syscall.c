@@ -130,3 +130,17 @@ int32_t _kill(pid_t pid, int32_t sig) {
                 : "r0", "r1");
         return r;
 }
+
+int32_t _setpriority(pid_t which, pid_t who, int32_t priority) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "svc #97    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (which), "r" (who), "r" (priority)
+                : "r0", "r1", "r2");
+        return r;
+}

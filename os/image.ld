@@ -7,10 +7,10 @@ SECTIONS
  .bss     : { *(.bss COMMON) }
  . = ALIGN(8);
 
- /* Allocate 4KB each for the SVC and IRQ mode stacks */
- . += 0x1000;
+ /* Allocate 64KB each for the SVC and IRQ mode stacks */
+ . += 0x10000;
  stack_top_svc = .;
- . += 0x1000;
+ . += 0x10000;
  stack_top_irq = .;
 
  /* 64KB of heap, for the _sbrk syscall */
