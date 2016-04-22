@@ -24,7 +24,7 @@ struct tailq_pid_head_t high_priority_queue_head;
  */
 void* set_stack_break(int32_t increment) {
         void* old_stack_break = current_stack_break;
-        current_stack_break += 1000;
+        current_stack_break -= increment;
         return old_stack_break;
 }
 
@@ -301,10 +301,10 @@ pid_t scheduler_fork(ctx_t* ctx) {
                 // and stack pointer
                 tailq_pcb_t *new_process = stdmem_allocate(sizeof(tailq_pcb_t));
                 pid_t new_pid = get_new_pid();
-                copy_pcb(&(new_process->pcb), find_process(current_pid));
+                pcb_t* process_to_copy = find_process(current_pid);
+                copy_pcb(&(new_process->pcb), process_to_copy);
                 copy_ctx(&(new_process->pcb.ctx), ctx);
                 new_process->pcb.pid = new_pid;
-                new_process->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
                 new_process->pcb.status = PROCESS_STATUS_READY;
                 new_process->pcb.ctx.gpr[0] = 0; // The child process should receive 0 from the fork call
 
@@ -313,6 +313,7 @@ pid_t scheduler_fork(ctx_t* ctx) {
                 // Now queue the new process
                 set_priority(new_pid, 1);
                 scheduler_emit_event((event_t){PROCESS_EVENT_CREATED, new_process->pcb.pid});
+
 
                 return new_process->pcb.pid;
         }
@@ -333,8 +334,12 @@ pid_t scheduler_getpid(ctx_t* ctx) {
  * @return the pid of the new process
  */
 pid_t scheduler_exec(ctx_t* ctx, void (*function)()) {
+        void* new_sp = set_stack_break(2000);
         ctx->pc = (uint32_t)(function);
-        ctx->sp = (uint32_t)(set_stack_break(1000));
+        ctx->gpr[11] = (uint32_t) new_sp; // Frame pointer
+        ctx->sp = (uint32_t) new_sp;
+        //ctx->sp = (uint32_t)(set_stack_break(1000));
+        save_current_process(ctx);
         pcb_t* current_process = find_process(current_pid);
         current_process->status = PROCESS_STATUS_RUNNING;
 
@@ -352,12 +357,13 @@ void scheduler_initialise(ctx_t* ctx) {
         TAILQ_INIT(&process_list);
 
         pid_t new_pid = get_new_pid();
+        void* new_sp = set_stack_break(2000);
 
         tailq_pcb_t *sh = stdmem_allocate(sizeof(tailq_pcb_t));
         sh->pcb.pid = new_pid;
         sh->pcb.ctx.cpsr = 0x50;
-        sh->pcb.ctx.pc = (uint32_t)(entry_sh);
-        sh->pcb.ctx.sp = (uint32_t)(set_stack_break(1000));
+        sh->pcb.ctx.pc = (uint32_t) entry_sh;
+        sh->pcb.ctx.sp = (uint32_t) new_sp;
         sh->pcb.status = PROCESS_STATUS_RUNNING;
         TAILQ_INSERT_TAIL(&process_list, sh, entries);
 
@@ -388,4 +394,54 @@ void copy_ctx(ctx_t* destination, ctx_t* source) {
 void copy_event(event_t* destination, event_t* source) {
         destination->event = source->event;
         destination->from_process = source->from_process;
+}
+
+
+char* running = "RUNNING";
+char* ready = "READY";
+char* blocked = "BLOCKED";
+char* terminated = "TERMINATED";
+
+char debug_result[200];
+
+char* debug_list_processes() {
+        int32_t result_index = 0;
+        result_index = stdstring_append(debug_result, result_index, "Processes: ");
+
+        tailq_pcb_t* item;
+        char* tmp = stdmem_allocate(sizeof(char)*15);
+        TAILQ_FOREACH(item, &process_list, entries) {
+                stdstring_int_to_str(item->pcb.pid, tmp);
+                result_index = stdstring_append(debug_result, result_index, "{");
+                result_index = stdstring_append(debug_result, result_index, tmp);
+                result_index = stdstring_append(debug_result, result_index, ", ");
+                switch (item->pcb.status) {
+                        case PROCESS_STATUS_RUNNING : { result_index = stdstring_append(debug_result, result_index, running); break; }
+                        case PROCESS_STATUS_READY : { result_index = stdstring_append(debug_result, result_index, ready); break; }
+                        case PROCESS_STATUS_BLOCKED : { result_index = stdstring_append(debug_result, result_index, blocked); break; }
+                        case PROCESS_STATUS_TERMINATED : { result_index = stdstring_append(debug_result, result_index, terminated); break; }
+                }
+
+                result_index = stdstring_append(debug_result, result_index, "} ");
+        }
+
+        return debug_result;
+}
+
+char* debug_priority(int32_t priority) {
+        int32_t result_index = 0;
+        result_index = stdstring_append(debug_result, result_index, "Priority queue: ");
+
+        struct tailq_pid_head_t* priority_queue_head = (priority == 0) ? &high_priority_queue_head : &low_priority_queue_head;
+
+        tailq_pid_t* item;
+        char* tmp = stdmem_allocate(sizeof(char)*15);
+        TAILQ_FOREACH(item, priority_queue_head, entries) {
+                stdstring_int_to_str(item->pid, tmp);
+                result_index = stdstring_append(debug_result, result_index, "{");
+                result_index = stdstring_append(debug_result, result_index, tmp);
+                result_index = stdstring_append(debug_result, result_index, "} ");
+        }
+
+        return debug_result;
 }

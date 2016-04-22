@@ -3,7 +3,7 @@
 
 #include <stdtypes.h>
 #include <stddef.h>
-#include <stdstr.h>
+#include <stdstring.h>
 
 #define STDIN_FILEDESC 0
 #define STDOUT_FILEDESC 1

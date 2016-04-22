@@ -57,6 +57,30 @@ void launch_process(void (*function)()) {
         }
 }
 
+void (*bg_process)();
+void launch_process_bg(void (*function)()) {
+        // Both copying the stack and COW are too complicated, just store the argument in a global
+        // so it's preserved on both sides of the fork. Obviously going to be some nasty race conditions here.
+        bg_process = function;
+        pid_t fork_pid = _fork();
+        if (fork_pid == 0) {
+                _exec(bg_process);
+        } else {
+                // The parent may get rescheduled first, in which case we must
+                // immediately yield() to let the the child process exec() and
+                // get a new stack - otherwise the child process will overwrite
+                // values in the parent stack when it returns from _fork().
+                // This is a bit of a hack, but necessitated by the fact we don't
+                // have copy-on-write.
+                // If we are at the top of the process queue, a call to yield may
+                // schedule this process again, so first get us to the back of the
+                // queue
+                _yield();
+                // Then let the other process take over
+                _yield();
+        }
+}
+
 shell_line_t make_line(char* prompt, size_t prompt_bytes, char* contents, size_t contents_bytes) {
         shell_line_t line = (shell_line_t) {
                 .prompt = prompt,
@@ -113,7 +137,7 @@ void line_control_seq(shell_line_t* line) {
                         line->cursor_position--;
                 }
         } else if (after_next == 'C') { // Right arrow
-                if (line->cursor_position < stdstr_length(line->contents)) {
+                if (line->cursor_position < stdstring_length(line->contents)) {
                         line->cursor_position++;
                 }
         }
@@ -123,7 +147,7 @@ void line_print(shell_line_t* line) {
         stdio_print("\33[2K\r");
         stdio_print(line->prompt);
         stdio_print(line->contents);
-        int32_t line_length = stdstr_length(line->contents);
+        int32_t line_length = stdstring_length(line->contents);
         for (int i = line_length; i > line->cursor_position; i--) {
                 stdio_printchar('\b');
         }
@@ -170,13 +194,23 @@ void mush() {
         stdio_print("Welcome to the mu shell\n");
         while (1) {
                 get_line(last_line, 101);
-                if (stdstr_compare(last_line, "exit") == 0) {
+                token_t* token = stdstring_next_token(last_line, " ");
+                if (stdstring_compare(token->token_start, "exit") == 0) {
                         _exit(EXIT_SUCCESS);
-                } else if (stdstr_compare(last_line, "P0") == 0) {
-                        launch_process(entry_P0);
-                } else if (stdstr_compare(last_line, "P1") == 0) {
+                } else if (stdstring_compare(token->token_start, "P0") == 0) {
+                        if (token->after_token != NULL) {
+                                token = stdstring_next_token(token->after_token, " ");
+                                if (stdstring_compare(token->token_start, "&") == 0) {
+                                        launch_process_bg(entry_P0);
+                                } else {
+                                        stdio_print("Invalid launch options\n");
+                                }
+                        } else {
+                                launch_process(entry_P0);
+                        }
+                } else if (stdstring_compare(token->token_start, "P1") == 0) {
                         launch_process(entry_P1);
-                } else if (stdstr_length(last_line) == 0) {
+                } else if (stdstring_length(token->token_start) == 0) {
                         continue;
                 } else {
                         stdio_print("Command not recognised\n");

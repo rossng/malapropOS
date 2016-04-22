@@ -2,7 +2,7 @@
 #include <syscall.h>
 
 void stdio_print(char* str) {
-        int32_t len = stdstr_length(str);
+        int32_t len = stdstring_length(str);
         _write(STDOUT_FILEDESC, str, len);
 }
 
@@ -12,13 +12,13 @@ void stdio_printchar(char c) {
 
 void stdio_printint(int32_t n) {
         char str[10] = {0};
-        stdstr_int_to_str(n, str);
+        stdstring_int_to_str(n, str);
 
-        _write(STDOUT_FILEDESC, str, stdstr_length(str));
+        _write(STDOUT_FILEDESC, str, stdstring_length(str));
 }
 
 void stdio_file_print(filedesc_t fd, char* str) {
-        _write(fd, str, stdstr_length(str));
+        _write(fd, str, stdstring_length(str));
 }
 
 /*

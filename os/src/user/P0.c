@@ -5,11 +5,12 @@
 
 void P0() {
         while (1) {
-                for (int i = 0; i < 5; i++) {
+                int i;
+                for (i = 0; i < 5; i++) {
                         stdio_print("P0: ");
                         stdio_printint(i);
                         stdio_print("\n");
-                        for (int i = 0; i < 0x5000000; i++) {
+                        for (int j = 0; j < 0x5000000; j++) {
                                 asm volatile("nop");
                         }
                 }

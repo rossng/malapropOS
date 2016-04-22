@@ -52,6 +52,6 @@ kill-gdb    :
 	@-killall --quiet --user ${USER} ${LINARO_PREFIX}-gdb
 
 clean       : kill-qemu kill-gdb
-	@rm -f core ${PROJECT_AS_OBJECTS} ${PROJECT_C_OBJECTS} ${PROJECT_TARGETS}
+	@rm -f core ${PROJECT_OBJECTS} ${PROJECT_C_OBJECTS} ${PROJECT_TARGETS}
 
 print-%  : ; @echo $* = $($*)
