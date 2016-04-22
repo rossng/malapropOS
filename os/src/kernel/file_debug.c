@@ -2,18 +2,18 @@
 
 char debug_result[200];
 
-char* debug_list_files() {
+char* debug_list_files() {/*
         int32_t result_index = 0;
         result_index = stdstring_append(debug_result, result_index, "Files: ");
 
-        tailq_file_t* item;
+        tailq_inode_t* item;
         char* tmp = stdmem_allocate(sizeof(char)*15);
         TAILQ_FOREACH(item, &open_files, entries) {
-                stdstring_int_to_str(item->file.fd, tmp);
+                stdstring_int_to_str(item->fd, tmp);
                 result_index = stdstring_append(debug_result, result_index, "{");
                 result_index = stdstring_append(debug_result, result_index, tmp);
                 result_index = stdstring_append(debug_result, result_index, ", ");
-                stdstring_int_to_str(item->file.offset, tmp);
+                stdstring_int_to_str(item->inode.offset, tmp);
                 result_index = stdstring_append(debug_result, result_index, tmp);
                 result_index = stdstring_append(debug_result, result_index, ", ");
 
@@ -22,7 +22,7 @@ char* debug_list_files() {
                 result_index = stdstring_append(debug_result, result_index, "} ");
         }
 
-        return debug_result;
+        return debug_result;*/
 }
 /*
 char* debug_priority(int32_t priority) {
