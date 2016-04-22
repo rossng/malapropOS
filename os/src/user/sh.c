@@ -34,7 +34,7 @@ char get_next_char() {
 }
 
 // See http://brennan.io/2015/01/16/write-a-shell-in-c/ for more info on basic shell implementation
-void launch_process(void (*function)()) {
+void launch_process(void (*function)(), int32_t priority) {
         pid_t fork_pid = _fork();
         int32_t status;
         if (fork_pid == 0) {
@@ -43,6 +43,7 @@ void launch_process(void (*function)()) {
         } else {
                 // Otherwise, wait for the child to complete
                 pid_t child_pid = fork_pid;
+                _setpriority(child_pid, 1, priority); // TODO: should really get the current pid dynamically (1 is a magic number)
                 pid_t result = 0;
                 bool waiting = 1;
                 do {
@@ -194,22 +195,36 @@ void mush() {
         stdio_print("Welcome to the mu shell\n");
         while (1) {
                 get_line(last_line, 101);
+                // TODO: make this sane
                 token_t* token = stdstring_next_token(last_line, " ");
                 if (stdstring_compare(token->token_start, "exit") == 0) {
                         _exit(EXIT_SUCCESS);
                 } else if (stdstring_compare(token->token_start, "P0") == 0) {
                         if (token->after_token != NULL) {
                                 token = stdstring_next_token(token->after_token, " ");
-                                if (stdstring_compare(token->token_start, "&") == 0) {
+                                if (stdstring_compare(token->token_start, "&") == 0) { // Background, low priority
                                         launch_process_bg(entry_P0);
+                                } else if (stdstring_compare(token->token_start, "!") == 0) { // Foreground, high priority
+                                        launch_process(entry_P0, 0);
+                                } else {
+                                        stdio_print("Invalid launch options\n");
+                                }
+                        } else { // Foreground, low priority
+                                launch_process(entry_P0, 1);
+                        }
+                } else if (stdstring_compare(token->token_start, "P1") == 0) {
+                        if (token->after_token != NULL) {
+                                token = stdstring_next_token(token->after_token, " ");
+                                if (stdstring_compare(token->token_start, "&") == 0) {
+                                        launch_process_bg(entry_P1);
+                                } else if (stdstring_compare(token->token_start, "!") == 0) {
+                                        launch_process(entry_P1, 0);
                                 } else {
                                         stdio_print("Invalid launch options\n");
                                 }
                         } else {
-                                launch_process(entry_P0);
+                                launch_process(entry_P1, 1);
                         }
-                } else if (stdstring_compare(token->token_start, "P1") == 0) {
-                        launch_process(entry_P1);
                 } else if (stdstring_length(token->token_start) == 0) {
                         continue;
                 } else {

@@ -32,6 +32,11 @@ typedef struct tailq_pid_s {
         TAILQ_ENTRY(tailq_pid_s) entries;
 } tailq_pid_t;
 
+typedef struct tailq_pidh_s {
+        pid_t pid;
+        TAILQ_ENTRY(tailq_pidh_s) entries;
+} tailq_pidh_t;
+
 typedef struct tailq_event_s {
         event_t event;
         TAILQ_ENTRY(tailq_event_s) entries;

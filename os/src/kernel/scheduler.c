@@ -13,11 +13,12 @@ void* current_stack_break = &stack_top_usr;
 
 TAILQ_HEAD(tailq_pcb_head_t, tailq_pcb_s);
 TAILQ_HEAD(tailq_pid_head_t, tailq_pid_s);
+TAILQ_HEAD(tailq_pidh_head_t, tailq_pidh_s);
 TAILQ_HEAD(tailq_event_head_t, tailq_event_s) events_head;
 
 struct tailq_pcb_head_t process_list;
 struct tailq_pid_head_t low_priority_queue_head;
-struct tailq_pid_head_t high_priority_queue_head;
+struct tailq_pidh_head_t high_priority_queue_head;
 
 /**
  * Like sbrk but for the stack.
@@ -73,16 +74,17 @@ void run_process(ctx_t* ctx, pid_t pid) {
  * Remove a PID from the specified priority queue
  */
 void remove_pid(pid_t pid, int32_t priority) {
-        tailq_pid_t* item;
         switch (priority) {
                 case 0 : {
-                        TAILQ_FOREACH(item, &high_priority_queue_head, entries) {
-                                if (item->pid == pid) {
-                                        TAILQ_REMOVE(&high_priority_queue_head, item, entries);
+                        tailq_pidh_t* itemh;
+                        TAILQ_FOREACH(itemh, &high_priority_queue_head, entries) {
+                                if (itemh->pid == pid) {
+                                        TAILQ_REMOVE(&high_priority_queue_head, itemh, entries);
                                 }
                         }
                 }
                 case 1 : {
+                        tailq_pid_t* item;
                         TAILQ_FOREACH(item, &low_priority_queue_head, entries) {
                                 if (item->pid == pid) {
                                         TAILQ_REMOVE(&low_priority_queue_head, item, entries);
@@ -96,14 +98,16 @@ void remove_pid(pid_t pid, int32_t priority) {
  * Add a PID to the specified priority queue
  */
 void add_pid(pid_t pid, int32_t priority) {
-        tailq_pid_t *new_pid = stdmem_allocate(sizeof(tailq_pid_t));
-        new_pid->pid = pid;
 
         switch (priority) {
                 case 0 : {
-                        TAILQ_INSERT_TAIL(&high_priority_queue_head, new_pid, entries);
+                        tailq_pidh_t *new_pidh = stdmem_allocate(sizeof(tailq_pidh_t));
+                        new_pidh->pid = pid;
+                        TAILQ_INSERT_TAIL(&high_priority_queue_head, new_pidh, entries);
                 }
                 case 1 : {
+                        tailq_pid_t *new_pid = stdmem_allocate(sizeof(tailq_pid_t));
+                        new_pid->pid = pid;
                         TAILQ_INSERT_TAIL(&low_priority_queue_head, new_pid, entries);
                 }
         }
@@ -123,33 +127,37 @@ void set_priority(pid_t pid, int32_t priority) {
  * @return -1 if the high priority queue is empty
  */
 pid_t get_next_process(int32_t priority) {
-        struct tailq_pid_head_t* priority_queue_head;
 
         switch (priority) {
                 case 0 : {
-                        priority_queue_head = &high_priority_queue_head;
-                        break;
+                        tailq_pidh_t* next_pidh_item;
+
+                        // Move the first item in the queue to the back and return its PID
+                        if (TAILQ_EMPTY(&high_priority_queue_head)) {
+                                return -1;
+                        }
+                        next_pidh_item = TAILQ_FIRST(&high_priority_queue_head);
+                        TAILQ_REMOVE(&high_priority_queue_head, next_pidh_item, entries);
+                        TAILQ_INSERT_TAIL(&high_priority_queue_head, next_pidh_item, entries);
+                        return next_pidh_item->pid;
                 }
                 case 1 : {
-                        priority_queue_head = &low_priority_queue_head;
-                        break;
+                        tailq_pid_t* next_pid_item;
+
+                        // Move the first item in the queue to the back and return its PID
+                        if (TAILQ_EMPTY(&low_priority_queue_head)) {
+                                return -1;
+                        }
+                        next_pid_item = TAILQ_FIRST(&low_priority_queue_head);
+                        TAILQ_REMOVE(&low_priority_queue_head, next_pid_item, entries);
+                        TAILQ_INSERT_TAIL(&low_priority_queue_head, next_pid_item, entries);
+                        return next_pid_item->pid;
                 }
                 default : {
                         return -1;
                 }
 
         }
-
-        tailq_pid_t* next_pid_item;
-
-        // Move the first item in the queue to the back and return its PID
-        if (TAILQ_EMPTY(priority_queue_head)) {
-                return -1;
-        }
-        next_pid_item = TAILQ_FIRST(priority_queue_head);
-        TAILQ_REMOVE(priority_queue_head, next_pid_item, entries);
-        TAILQ_INSERT_TAIL(priority_queue_head, next_pid_item, entries);
-        return next_pid_item->pid;
 }
 
 /**
@@ -163,9 +171,7 @@ void scheduler_run(ctx_t* ctx) {
         }
 
         save_current_process(ctx);
-
         run_process(ctx, next_proc_pid);
-
         return;
 }
 
@@ -432,16 +438,29 @@ char* debug_priority(int32_t priority) {
         int32_t result_index = 0;
         result_index = stdstring_append(debug_result, result_index, "Priority queue: ");
 
-        struct tailq_pid_head_t* priority_queue_head = (priority == 0) ? &high_priority_queue_head : &low_priority_queue_head;
+        if (priority == 0) {
+                tailq_pidh_t* item;
+                char* tmp = stdmem_allocate(sizeof(char)*15);
+                TAILQ_FOREACH(item, &high_priority_queue_head, entries) {
+                        stdstring_int_to_str(item->pid, tmp);
+                        result_index = stdstring_append(debug_result, result_index, "{");
+                        result_index = stdstring_append(debug_result, result_index, tmp);
+                        result_index = stdstring_append(debug_result, result_index, "} ");
+                }
+                return debug_result;
 
-        tailq_pid_t* item;
-        char* tmp = stdmem_allocate(sizeof(char)*15);
-        TAILQ_FOREACH(item, priority_queue_head, entries) {
-                stdstring_int_to_str(item->pid, tmp);
-                result_index = stdstring_append(debug_result, result_index, "{");
-                result_index = stdstring_append(debug_result, result_index, tmp);
-                result_index = stdstring_append(debug_result, result_index, "} ");
+        } else if (priority == 1) {
+                tailq_pid_t* item;
+                char* tmp = stdmem_allocate(sizeof(char)*15);
+                TAILQ_FOREACH(item, &low_priority_queue_head, entries) {
+                        stdstring_int_to_str(item->pid, tmp);
+                        result_index = stdstring_append(debug_result, result_index, "{");
+                        result_index = stdstring_append(debug_result, result_index, tmp);
+                        result_index = stdstring_append(debug_result, result_index, "} ");
+                }
+                return debug_result;
+
+        } else {
+                return "";
         }
-
-        return debug_result;
 }
