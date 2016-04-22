@@ -98,3 +98,7 @@ uint8_t PL011_geth( PL011_t* d            ) {
 
   return x;
 }
+
+void PL011_clear(PL011_t* d) {
+        d->DR = 0;
+}

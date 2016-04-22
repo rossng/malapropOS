@@ -3,6 +3,7 @@
 #include "sh.h"
 #include "P0.h"
 #include "P1.h"
+#include "P2.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -224,6 +225,19 @@ void mush() {
                                 }
                         } else {
                                 launch_process(entry_P1, 1);
+                        }
+                } else if (stdstring_compare(token->token_start, "P2") == 0) {
+                        if (token->after_token != NULL) {
+                                token = stdstring_next_token(token->after_token, " ");
+                                if (stdstring_compare(token->token_start, "&") == 0) {
+                                        launch_process_bg(entry_P2);
+                                } else if (stdstring_compare(token->token_start, "!") == 0) {
+                                        launch_process(entry_P2, 0);
+                                } else {
+                                        stdio_print("Invalid launch options\n");
+                                }
+                        } else {
+                                launch_process(entry_P2, 1);
                         }
                 } else if (stdstring_length(token->token_start) == 0) {
                         continue;

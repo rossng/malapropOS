@@ -2,6 +2,7 @@
 #include "../device/GIC.h"
 #include "../device/SP804.h"
 #include "../user/syscall.h"
+#include "../device/disk.h"
 
 #include "irq.h"
 #include "scheduler.h"
@@ -26,7 +27,12 @@ void kernel_handler_rst(ctx_t* ctx) {
         PL011_puts(UART0, "Configuring UART\n", 17);
 
         UART0->IMSC |= 0x00000010; // enable UART    (Rx) interrupt
-        UART0->CR = 0x00000301; // enable UART (Tx+Rx)
+        UART0->CR = 0x00000301; // enable UART0 (Tx+Rx) - see PL011 manual p3-15
+        UART1->CR = 0x00000301; // enable UART1 (Tx+Rx)
+
+        // Write a '1' at the beginning of the disk
+        const uint8_t ch = '1';
+        disk_wr(0, &ch, 1);
 
         PL011_puts(UART0, "Configuring Interrupt Controller\n", 33);
 
@@ -99,6 +105,15 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         int len = (int)(ctx->gpr[2]);
 
                         int32_t result = sys_write(fd, ptr, len);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 5 : { // open
+                        char* pathname = (char*)(ctx->gpr[0]);
+                        int32_t flags = (int32_t)(ctx->gpr[1]);
+
+                        filedesc_t result = sys_open(pathname, flags);
 
                         ctx->gpr[0] = result;
                         break;
