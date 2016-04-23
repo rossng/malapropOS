@@ -73,7 +73,7 @@ uint8_t pack_file_attributes(fat16_file_attr_t attributes) {
         return result;
 }
 
-uint16_t get_fat_entry(fat16_t* fs, uint16_t cluster_number) {
+uint16_t get_successor_cluster(fat16_t* fs, uint16_t cluster_number) {
         fat16_regions_t regions = calculate_regions(fs);
 
         uint32_t in_fat_sector = ((cluster_number * 2) / fs->bytes_per_sector); // entry is in this sector of the FAT
@@ -109,7 +109,7 @@ int32_t set_successor_cluster(fat16_t* fs, uint16_t cluster_number, uint16_t suc
 }
 
 /**
- * Searches for the first free cluster in the FAT. If none is found, return -1.
+ * Searches for the first free cluster in the FAT. If none is found, return .
  */
 uint16_t find_first_free_cluster(fat16_t* fs) {
         fat16_regions_t regions = calculate_regions(fs);
@@ -127,11 +127,23 @@ uint16_t find_first_free_cluster(fat16_t* fs) {
                 }
         }
 
-        return -1;
+        return 0;
 }
 
-int32_t add_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* entry) {
-        return 0;
+/**
+ * Finds the byte index of the first free space in the directory cluster provided.
+ * If there is no free slot, return -1
+ */
+int32_t find_first_free_space_in_directory_cluster(fat16_t* fs, uint8_t* cluster) {
+        uint32_t bytes_per_cluster = fs->bytes_per_sector * fs->sectors_per_cluster;
+        uint32_t num_entries = bytes_per_cluster / 32;
+
+        for (int i = 0; i < num_entries; i++) {
+                if (cluster[i*32] == 0x00 || cluster[i*32] == 0xe5) { // Either empty or deleted
+                        return i*32;
+                }
+        }
+        return -1;
 }
 
 void load_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
@@ -145,6 +157,69 @@ void load_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
         }
 }
 
+void write_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
+        fat16_regions_t regions = calculate_regions(fs);
+
+        uint32_t first_sector = regions.data_region_start + (cluster_number - 2) * fs->sectors_per_cluster;
+
+        for (int i = 0; i < fs->sectors_per_cluster; i++) {
+                disk_wr(first_sector + i, &buf[i*fs->bytes_per_sector], fs->bytes_per_sector);
+        }
+}
+
+int32_t add_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* entry) {
+        uint8_t* current_cluster = stdmem_allocate(fs->bytes_per_sector * fs->sectors_per_cluster); // buffer to read the cluster into
+
+        // Load the first cluster of the directory
+        load_cluster(fs, dir_cluster, current_cluster);
+
+        uint16_t current_cluster_num = dir_cluster;
+        uint16_t previous_cluster_num = 0;
+        int32_t first_space = find_first_free_space_in_directory_cluster(fs, current_cluster);
+        while (first_space == -1) {
+                // Get the next cluster in this directory and load it
+                previous_cluster_num = current_cluster_num;
+                current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+
+                if (current_cluster_num < 0x0002 || current_cluster_num > 0x0fef) {
+                        // We did not find a free before the end of the existing directory clusters
+                        current_cluster_num = find_first_free_cluster(fs);
+                        if (current_cluster_num < 2) {
+                                // We failed to find a new cluster, so report failure
+                                return -1;
+                        }
+                        set_successor_cluster(fs, previous_cluster_num, current_cluster_num);
+                        first_space = 0;
+                        break;
+                }
+
+                load_cluster(fs, current_cluster_num, current_cluster);
+                // Look for a free space in this cluster
+                first_space = find_first_free_space_in_directory_cluster(fs, current_cluster);
+        }
+
+        current_cluster[first_space] = entry->filename[0] == 0xe5 ? 0x05 : entry->filename[0];
+        for (int i = 1; i < 8; i++) {
+                current_cluster[first_space + i] = entry->filename[i];
+        }
+        for (int i = 0; i < 3; i++) {
+                current_cluster[first_space + 0x08 + i] = entry->extension[i];
+        }
+        current_cluster[first_space + 0x0b] = entry->attributes;
+
+        current_cluster[first_space + 0x1a] = (entry->first_cluster) & 0xFF;
+        current_cluster[first_space + 0x1b] = ((entry->first_cluster)>>8) & 0xFF;
+
+        current_cluster[first_space + 0x1c] = (entry->file_size_bytes) & 0xFF;
+        current_cluster[first_space + 0x1d] = ((entry->file_size_bytes)>>8) & 0xFF;
+        current_cluster[first_space + 0x1e] = ((entry->file_size_bytes)>>16) & 0xFF;
+        current_cluster[first_space + 0x1f] = ((entry->file_size_bytes)>>24) & 0xFF;
+
+        write_cluster(fs, current_cluster_num, current_cluster);
+
+        return 0;
+}
+
 fat16_file_data_t load_file(fat16_t* fs, fat16_dir_entry_t* entry) {
         fat16_regions_t regions = calculate_regions(fs);
 
@@ -156,12 +231,12 @@ fat16_file_data_t load_file(fat16_t* fs, fat16_dir_entry_t* entry) {
                 load_cluster(fs, entry->first_cluster, &file_data[file_clusters_written * fs->sectors_per_cluster * fs->bytes_per_sector]);
                 file_clusters_written++;
 
-                uint16_t next_cluster = get_fat_entry(fs, entry->first_cluster);
+                uint16_t next_cluster = get_successor_cluster(fs, entry->first_cluster);
 
                 while (0x0001 < next_cluster && next_cluster < 0xfff0) {
                         load_cluster(fs, next_cluster, &file_data[file_clusters_written * fs->sectors_per_cluster * fs->bytes_per_sector]);
                         file_clusters_written++;
-                        next_cluster = get_fat_entry(fs, next_cluster);
+                        next_cluster = get_successor_cluster(fs, next_cluster);
                 }
         }
 
@@ -178,10 +253,10 @@ uint16_t num_clusters_in_chain(fat16_t* fs, uint16_t first_cluster) {
         if (0x0001 < first_cluster && first_cluster < 0xfff0) {
                 count++;
 
-                uint16_t next_cluster = get_fat_entry(fs, first_cluster);
+                uint16_t next_cluster = get_successor_cluster(fs, first_cluster);
                 while (0x0001 < next_cluster && next_cluster < 0xfff0) {
                         count++;
-                        next_cluster = get_fat_entry(fs, next_cluster);
+                        next_cluster = get_successor_cluster(fs, next_cluster);
                 }
         }
 
@@ -273,7 +348,7 @@ tailq_fat16_dir_head_t* get_dir(fat16_t* fs, fat16_dir_entry_t* entry) {
                         entries_have_terminated = add_sector_dir_entries_to_list(fs, &current_cluster[i*fs->bytes_per_sector], result);
                 }
 
-                uint16_t next_cluster = get_fat_entry(fs, entry->first_cluster);
+                uint16_t next_cluster = get_successor_cluster(fs, entry->first_cluster);
 
                 while (0x0001 < next_cluster && next_cluster < 0xfff0 && !entries_have_terminated) {
                         load_cluster(fs, next_cluster, current_cluster);
@@ -282,7 +357,7 @@ tailq_fat16_dir_head_t* get_dir(fat16_t* fs, fat16_dir_entry_t* entry) {
                                 entries_have_terminated = add_sector_dir_entries_to_list(fs, &current_cluster[i*fs->bytes_per_sector], result);
                         }
 
-                        next_cluster = get_fat_entry(fs, next_cluster);
+                        next_cluster = get_successor_cluster(fs, next_cluster);
                 }
         }
 
@@ -583,15 +658,32 @@ int32_t create_new_file(char* pathname) {
                 return -1;
         }
 
-        to_filename(pathname);
+        char* filename = to_filename(pathname);
+        fat16_file_name_t file = split_filename(filename);
 
-        return -1;
+        fat16_dir_entry_t* new_file = stdmem_allocate(sizeof(fat16_dir_entry_t));
+        int i;
+        for (i = 0; i < 8 && file.name[i] != '\0'; i++) {
+                new_file->filename[i] = file.name[i];
+        }
+        for (; i < 8; i++) {
+                new_file->filename[i] = 0x20;
+        }
 
+        for (i = 0; i < 3 && file.extension[i] != '\0'; i++) {
+                new_file->extension[i] = file.extension[i];
+        }
+        for (; i < 3; i++) {
+                new_file->extension[i] = 0x20;
+        }
+        new_file->attributes = 0;
+        new_file->first_cluster = find_first_free_cluster(fs);
+        new_file->file_size_bytes = 0;
+
+        set_successor_cluster(fs, new_file->first_cluster, 0xFFFF);
+
+        return add_directory_entry(fs, dir->first_cluster, new_file);
 }
-
-char* path = "/MYFILE1.TXT";
-char* path2 = "/ANOTHER.DOC";
-char* path3 = "/SUBDIR/ASTORY.TXT";
 
 filedesc_t sys_open(char* pathname, int32_t flags) {
 

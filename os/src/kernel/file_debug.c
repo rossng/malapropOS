@@ -2,6 +2,11 @@
 
 char debug_result[200];
 
+char* path = "/MYFILE1.TXT";
+char* path2 = "/ANOTHER.DOC";
+char* path3 = "/SUBDIR/ASTORY.TXT";
+char* path_new = "/SUBDIR/NEWFILE.DOC";
+
 char* debug_file_list() {
         int32_t result_index = 0;
         result_index = stdstring_append(debug_result, result_index, "Files: ");
