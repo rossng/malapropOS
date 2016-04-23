@@ -13,9 +13,6 @@ struct tailq_stream_head* stdin_buffer;
 struct tailq_stream_head* stdout_buffer;
 struct tailq_stream_head* stderr_buffer;
 
-//TAILQ_HEAD(tailq_inode_head_t, tailq_inode_s);
-//struct tailq_inode_head_t open_files;
-
 typedef struct fat16_s {
         uint16_t bytes_per_sector;
         uint8_t sectors_per_cluster;
@@ -42,8 +39,8 @@ typedef struct fat16_regions_s {
 } fat16_regions_t;
 
 typedef struct fat16_dir_entry_s {
-        char filename[8];
-        char extension[3];
+        char filename[9];
+        char extension[4];
         uint8_t attributes;
         // Ignore updated and created dates
         uint16_t first_cluster;
@@ -73,6 +70,28 @@ typedef struct fat16_file_clusters_s {
         uint16_t* cluster_address; // Array of cluster addresses
         uint32_t num_clusters;
 } fat16_file_clusters_t;
+
+typedef struct fat16_file_path_s {
+        char** parts;
+        uint32_t num_parts;
+} fat16_file_path_t;
+
+typedef struct fat16_file_name_s {
+        char* name;
+        char* extension;
+} fat16_file_name_t;
+
+typedef struct tailq_open_file_s {
+        filedesc_t fd;
+        fat16_dir_entry_t* directory_entry;
+        char* path;
+        int32_t offset;
+        TAILQ_ENTRY(tailq_open_file_s) entries;
+} tailq_open_file_t;
+
+TAILQ_HEAD(tailq_open_files_head_s, tailq_open_file_s);
+typedef struct tailq_open_files_head_s tailq_open_files_head_t;
+tailq_open_files_head_t* open_files;
 
 int32_t sys_write(int fd, char *ptr, size_t len);
 int32_t sys_read(int fd, char *ptr, size_t len);

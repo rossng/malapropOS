@@ -9,6 +9,10 @@ struct tailq_stream_head* stderr_buffer;
 TAILQ_HEAD(tailq_fat16_dir_head_s, tailq_fat16_dir_entry_s);
 typedef struct tailq_fat16_dir_head_s tailq_fat16_dir_head_t;
 
+filedesc_t next_fd = 3;
+
+fat16_t* fs;
+
 fat16_t* inspect_file_system() {
         // Don't think there's any easy way to make this truly sector-size-independent
         // TODO: magic numbers!
@@ -47,12 +51,12 @@ fat16_regions_t calculate_regions(fat16_t* fs) {
 
 fat16_file_attr_t unpack_file_attributes(uint8_t attributes_byte) {
         fat16_file_attr_t result;
-        result.is_read_only = attributes_byte & 0x01;
-        result.is_hidden_file = attributes_byte & 0x02;
-        result.is_system_file = attributes_byte & 0x04;
-        result.is_volume_label = attributes_byte & 0x08;
-        result.is_subdirectory = attributes_byte & 0x10;
-        result.is_archive = attributes_byte & 0x20;
+        result.is_read_only = (attributes_byte & 0x01) && 1;
+        result.is_hidden_file = (attributes_byte & 0x02) && 1;
+        result.is_system_file = (attributes_byte & 0x04) && 1;
+        result.is_volume_label = (attributes_byte & 0x08) && 1;
+        result.is_subdirectory = (attributes_byte & 0x10) && 1;
+        result.is_archive = (attributes_byte & 0x20) && 1;
 
         return result;
 }
@@ -156,8 +160,9 @@ bool add_sector_dir_entries_to_list(fat16_t* fs, uint8_t* sector, tailq_fat16_di
                         tailq_fat16_dir_entry_t* list_entry = stdmem_allocate(sizeof(tailq_fat16_dir_entry_t));
 
                         for (int k = 0; k < 8; k++) {
-                                list_entry->entry.filename[k] = sector[entry_bytes*j + k];
+                                list_entry->entry.filename[k] = sector[entry_bytes*j + k] == 0x20 ? '\0' : sector[entry_bytes*j + k];
                         }
+                        list_entry->entry.filename[9] = '\0';
                         if (sector[entry_bytes*j] == 0x05) {
                                // The first character of the filename is actually 0xe5 (lol)
                                list_entry->entry.filename[0] = 0xe5;
@@ -165,6 +170,7 @@ bool add_sector_dir_entries_to_list(fat16_t* fs, uint8_t* sector, tailq_fat16_di
                         for (int k = 0; k < 3; k++) {
                                 list_entry->entry.extension[k] = sector[entry_bytes*j + 0x08 + k];
                         }
+                        list_entry->entry.extension[4] = '\0';
                         list_entry->entry.attributes = sector[entry_bytes*j + 0x0b];
                         list_entry->entry.first_cluster = sector[entry_bytes*j + 0x1a] + sector[entry_bytes*j + 0x1b]*256;
                         list_entry->entry.file_size_bytes = sector[entry_bytes*j + 0x1c] + 256*(sector[entry_bytes*j + 0x1d] + 256*(sector[entry_bytes*j + 0x1e] + 256*sector[entry_bytes*j + 0x1f]));
@@ -175,8 +181,6 @@ bool add_sector_dir_entries_to_list(fat16_t* fs, uint8_t* sector, tailq_fat16_di
 
         return 0;
 }
-
-
 
 tailq_fat16_dir_head_t* get_root_dir(fat16_t* fs) {
         uint8_t* current_sector = stdmem_allocate(fs->bytes_per_sector);
@@ -236,15 +240,30 @@ tailq_fat16_dir_head_t* get_dir(fat16_t* fs, fat16_dir_entry_t* entry) {
         }
 
         return result;
-
-
 }
+
+
 
 void debug_fs() {
         fat16_t* fs = inspect_file_system();
         tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
         tailq_fat16_dir_entry_t* first_entry = TAILQ_FIRST(root_dir);
         fat16_file_data_t file_data = load_file(fs, &first_entry->entry);
+
+        tailq_fat16_dir_entry_t* directory_entry;
+        TAILQ_FOREACH(directory_entry, root_dir, entries) {
+                fat16_file_attr_t attributes = unpack_file_attributes(directory_entry->entry.attributes);
+                if (attributes.is_subdirectory) {
+                        break;
+                }
+        }
+
+        tailq_fat16_dir_head_t* subdirectory = get_dir(fs, &directory_entry->entry);
+
+        tailq_fat16_dir_entry_t* subdirectory_entry;
+        TAILQ_FOREACH(subdirectory_entry, subdirectory, entries) {
+                fat16_file_attr_t attributes = unpack_file_attributes(subdirectory_entry->entry.attributes);
+        }
 }
 
 
@@ -281,25 +300,286 @@ void file_initialise() {
         stdin_buffer = stdstream_initialise_buffer();
         stdout_buffer = stdstream_initialise_buffer();
         stderr_buffer = stdstream_initialise_buffer();
-        //TAILQ_INIT(&open_files);
+        fs = inspect_file_system();
+        TAILQ_INIT(open_files);
 }
 
-filedesc_t sys_open(char* pathname, int32_t flags) {
-        /*
-        inode_t* result = find_open_file(pathname);
-        if (result == NULL) {
-                if (flags & O_CREAT) {
-                        result = create_new_file(pathname);
+tailq_open_file_t* find_open_file(char* pathname) {
+        tailq_open_file_t* open_file;
+        TAILQ_FOREACH(open_file, open_files, entries) {
+                if (stdstring_compare(open_file->path, pathname) == 0) {
+                        return open_file;
+                }
+        }
+        return NULL;
+}
+
+fat16_file_path_t split_path(char* pathname) {
+        if (pathname[0] == '/') {
+                pathname = &pathname[1];
+        }
+
+        int32_t num_parts = 1;
+        for (int i = 0; i < stdstring_length(pathname); i++) {
+                if (pathname[i] == '/') {
+                        num_parts++;
+                }
+        }
+        char** parts = stdmem_allocate(sizeof(char*)*num_parts);
+
+        int part_num = 0;
+        int i = 0;
+        while (pathname[i] != '\0') {
+                int j = 0;
+                while (pathname[i+j] != '/' && pathname[i+j] != '\0') {
+                        j++;
+                }
+
+                parts[part_num] = stdmem_allocate(sizeof(char)*(j+1));
+
+                stdmem_copy(parts[part_num], &pathname[i], j);
+                parts[part_num][j] = '\0';
+
+                i += (j + 1);
+                part_num++;
+        }
+
+        return (fat16_file_path_t){parts, num_parts};
+}
+
+char* descend_path(char* pathname) {
+        if (pathname[0] == '/') {
+                pathname = &pathname[1];
+        }
+        int i = 0;
+        while (pathname[i] != '/' && pathname[i] != '\0') {
+                i++;
+        }
+        return &pathname[i];
+}
+
+/**
+ * Remove the filename from the end of a path
+ */
+char* to_directory(char* pathname) {
+        int32_t last_slash_pos = 0;
+        int32_t i = 0;
+        while (pathname[i] != '\0') {
+                if (pathname[i] == '/') {
+                        last_slash_pos = i;
+                }
+                i++;
+        }
+
+        char* dir_path = stdmem_allocate(sizeof(char)*(last_slash_pos+1));
+        stdmem_copy(dir_path, pathname, last_slash_pos + 1);
+        dir_path[last_slash_pos] = '\0';
+
+        return dir_path;
+}
+
+/**
+ * Just get the filename from the end of a path
+ */
+char* to_filename(char* pathname) {
+        int32_t last_slash_pos = 0;
+        int32_t i = 0;
+        while (pathname[i] != '\0') {
+                if (pathname[i] == '/') {
+                        last_slash_pos = i;
+                }
+                i++;
+        }
+
+        char* filename = stdmem_allocate(sizeof(char)*(i - last_slash_pos));
+        stdmem_copy(filename, &pathname[last_slash_pos+1], i - last_slash_pos);
+
+        return filename;
+}
+
+fat16_file_name_t split_filename(char* filename) {
+        fat16_file_name_t result;
+        result.name = stdmem_allocate(sizeof(char)*8);
+        result.extension = stdmem_allocate(sizeof(char)*3);
+
+        int i = 0;
+        while (filename[i] != '.' && i < 8 && filename[i] != '\0') {
+                result.name[i] = filename[i];
+                i++;
+        }
+        result.name[i+1] = '\0';
+
+        if (filename[i] == '\0') {
+                result.extension[0] = '\0';
+        } else {
+                i++;
+                int j = 0;
+                while (filename[i+j] != '\0' && j < 3) {
+                        result.extension[j] = filename[i+j];
+                        j++;
+                }
+                result.extension[j+1] = '\0';
+        }
+
+        return result;
+}
+
+fat16_dir_entry_t* find_file(char* pathname, tailq_fat16_dir_head_t* dir) {
+        fat16_dir_entry_t* result = NULL;
+
+        fat16_file_path_t path = split_path(pathname);
+
+        if (path.num_parts > 1) {
+                // Search for next directory in the path
+                tailq_fat16_dir_entry_t* dir_entry;
+                TAILQ_FOREACH(dir_entry, dir, entries) {
+                        fat16_file_attr_t attributes = unpack_file_attributes(dir_entry->entry.attributes);
+                        if (attributes.is_subdirectory) {
+                                if (stdstring_compare(path.parts[0], &(dir_entry->entry.filename[0])) == 0) { // TODO: extensions
+                                        tailq_fat16_dir_head_t* next_dir = get_dir(fs, &(dir_entry->entry));
+                                        if (next_dir != NULL) {
+                                                result = find_file(descend_path(pathname), next_dir);
+                                        }
+                                }
+                        }
+                }
+
+        } else if (path.num_parts == 1) {
+                // Search for a file in this directory
+                tailq_fat16_dir_entry_t* file_entry;
+                fat16_file_name_t filename = split_filename(path.parts[0]);
+                TAILQ_FOREACH(file_entry, dir, entries) {
+                        fat16_file_attr_t attributes = unpack_file_attributes(file_entry->entry.attributes);
+                        if (attributes.is_subdirectory) {
+                                continue;
+                        }
+                        if (stdstring_compare(filename.name, &(file_entry->entry.filename[0])) == 0 && stdstring_compare(filename.extension, &(file_entry->entry.extension[0])) == 0) {
+                                return &file_entry->entry;
+                        }
+                }
+        }
+        return result;
+}
+
+fat16_dir_entry_t* find_dir(char* pathname, tailq_fat16_dir_head_t* dir) {
+        fat16_dir_entry_t* result = NULL;
+
+        fat16_file_path_t path = split_path(pathname);
+
+        if (path.num_parts > 1) {
+                // Search for next directory in the path
+                tailq_fat16_dir_entry_t* dir_entry;
+                TAILQ_FOREACH(dir_entry, dir, entries) {
+                        fat16_file_attr_t attributes = unpack_file_attributes(dir_entry->entry.attributes);
+                        if (attributes.is_subdirectory) {
+                                if (stdstring_compare(path.parts[0], &(dir_entry->entry.filename[0])) == 0) { // TODO: extensions
+                                        tailq_fat16_dir_head_t* next_dir = get_dir(fs, &(dir_entry->entry));
+                                        if (next_dir != NULL) {
+                                                result = find_dir(descend_path(pathname), next_dir);
+                                        }
+                                }
+                        }
+                }
+
+        } else if (path.num_parts == 1) {
+                // Search for the directory in this directory
+                tailq_fat16_dir_entry_t* file_entry;
+                fat16_file_name_t filename = split_filename(path.parts[0]);
+                TAILQ_FOREACH(file_entry, dir, entries) {
+                        fat16_file_attr_t attributes = unpack_file_attributes(file_entry->entry.attributes);
+                        if (attributes.is_subdirectory) {
+                                if (stdstring_compare(filename.name, &(file_entry->entry.filename[0])) == 0) { // TODO: extensions
+                                        return &file_entry->entry;
+                                }
+                        }
+                }
+        }
+        return result;
+}
+
+filedesc_t get_next_filedesc() {
+        return next_fd++;
+}
+
+tailq_open_file_t* open_file(char* pathname) {
+        tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
+        if (pathname[0] != '/') {
+                return NULL;
+        } else {
+                fat16_dir_entry_t* file = find_file(&pathname[1], root_dir);
+                if (file == NULL) {
+                        return NULL;
                 } else {
-                        return -1;
+                        tailq_open_file_t* opened_file = stdmem_allocate(sizeof(tailq_open_file_t));
+                        opened_file->directory_entry = file;
+                        opened_file->fd = get_next_filedesc();
+                        opened_file->offset = 0;
+                        opened_file->path = pathname;
+                        TAILQ_INSERT_TAIL(open_files, opened_file, entries);
+                        return opened_file;
+                }
+        }
+}
+
+/**
+ * -1 = failure, 0 = succes
+ */
+int32_t create_new_file(char* pathname) {
+        tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
+        if (pathname[0] != '/') {
+                return -1;
+        }
+
+        // If the directory doesn't exist, fail
+        fat16_dir_entry_t* dir = find_dir(to_directory(pathname), root_dir);
+        if (dir == NULL) {
+                return -1;
+        }
+
+        to_filename(pathname);
+
+        return -1;
+
+}
+
+char* path = "/MYFILE1.TXT";
+char* path2 = "/ANOTHER.DOC";
+char* path3 = "/SUBDIR/ASTORY.TXT";
+
+filedesc_t sys_open(char* pathname, int32_t flags) {
+
+        // First, see if the file has already been opened
+        tailq_open_file_t* result = find_open_file(pathname);
+        if (result == NULL) {
+                // If it hasn't, search for the file on disk
+                result = open_file(pathname);
+                if (result == NULL) {
+                        // If the file doesn't exist on disk but the O_CREAT flag
+                        // has been passed, create it
+                        if (flags & O_CREAT) {
+                                if (-1 == create_new_file(pathname)) {
+                                        // If the file could not be created, fail
+                                        return -1;
+                                } else {
+                                        // Attempt to open the newly-created file
+                                        result = open_file(pathname);
+                                        if (result == NULL) {
+                                                // If it does not exist, fail
+                                                return -1;
+                                        }
+                                }
+                        } else {
+                                // If the O_CREATE flag was not passed, fail
+                                return -1;
+                        }
                 }
         }
 
         if (flags & O_APPEND) { // Move offset to end of file
-                result->offset = 0; // TODO
+                result->offset = result->directory_entry->file_size_bytes;
         } else { // Move offset to beginning of file
                 result->offset = 0;
         }
 
-        return result->fd;*/
+        return result->fd;
 }
