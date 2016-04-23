@@ -87,6 +87,53 @@ uint16_t get_fat_entry(fat16_t* fs, uint16_t cluster_number) {
         return fat_sector[entry_in_sector*2] + fat_sector[entry_in_sector*2 + 1]*256;
 }
 
+/**
+ * Sets the FAT entry for the specified cluster to the provided value.
+ * Returns -1 on failure, 0 on success
+ */
+int32_t set_successor_cluster(fat16_t* fs, uint16_t cluster_number, uint16_t successor_cluster_number) {
+        fat16_regions_t regions = calculate_regions(fs);
+
+        uint32_t in_fat_sector = ((cluster_number * 2) / fs->bytes_per_sector); // entry is in this sector of the FAT
+        uint32_t in_sector = regions.fat_region_start + in_fat_sector; // entry is in this sector of the disk
+        uint8_t* fat_sector = stdmem_allocate(fs->bytes_per_sector); // buffer to read the sector into
+        disk_rd(in_sector, fat_sector, fs->bytes_per_sector);
+
+        // Update the entry and write it back to disk
+        uint16_t index_in_sector = (cluster_number * 2) - (in_fat_sector*fs->bytes_per_sector); // entry is at this byte index of the FAT sector
+        fat_sector[index_in_sector] = successor_cluster_number & 0xFF;
+        fat_sector[index_in_sector + 1] = (successor_cluster_number >> 8) & 0xFF;
+        disk_wr(in_sector, fat_sector, fs->bytes_per_sector);
+
+        return 0;
+}
+
+/**
+ * Searches for the first free cluster in the FAT. If none is found, return -1.
+ */
+uint16_t find_first_free_cluster(fat16_t* fs) {
+        fat16_regions_t regions = calculate_regions(fs);
+
+        uint8_t* fat_sector = stdmem_allocate(fs->bytes_per_sector); // buffer to read the sector into
+
+        uint16_t entries_per_sector = fs->bytes_per_sector / 2;
+
+        for (int i = 0; i < fs->num_sectors_per_file_allocation_table; i++) {
+                disk_rd(regions.fat_region_start + i, fat_sector, fs->bytes_per_sector);
+                for (int j = 0; j < entries_per_sector; j++) {
+                        if (fat_sector[j*2] == 0x00 && fat_sector[j*2+1] == 0x00) {
+                                return entries_per_sector*i + j;
+                        }
+                }
+        }
+
+        return -1;
+}
+
+int32_t add_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* entry) {
+        return 0;
+}
+
 void load_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
         fat16_regions_t regions = calculate_regions(fs);
 
