@@ -146,6 +146,35 @@ int32_t find_first_free_space_in_directory_cluster(fat16_t* fs, uint8_t* cluster
         return -1;
 }
 
+/**
+ * Finds the specified file in some cluster data and returns the byte index of
+ * the beginning of the file's entry. Returns -1 if the file is not found.
+ */
+int32_t find_file_in_directory_cluster(fat16_t* fs, uint8_t* cluster, char* filename, char* extension) {
+        uint32_t bytes_per_cluster = fs->bytes_per_sector * fs->sectors_per_cluster;
+        uint32_t num_entries = bytes_per_cluster / 32;
+
+        for (int i = 0; i < num_entries; i++) {
+                bool matches = 1;
+                // Compare the filename
+                for (int j = 0; j < 8; j++) {
+                        if (cluster[i*32 + j] == 0x20 && filename[j] == '\0') {
+                                break;
+                        }
+                        matches &= (cluster[i*32 + j] == filename[j]);
+                }
+                // Compare the extension
+                for (int j = 0; j < 3; j++) {
+                        matches &= (cluster[i*32 + 0x8 + j] == extension[j]);
+                }
+                // If the match flag is still true, return the byte index
+                if (matches) {
+                        return i*32;
+                }
+        }
+        return -1;
+}
+
 void load_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
         fat16_regions_t regions = calculate_regions(fs);
 
@@ -220,24 +249,61 @@ int32_t add_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t
         return 0;
 }
 
-fat16_file_data_t load_file(fat16_t* fs, fat16_dir_entry_t* entry) {
-        fat16_regions_t regions = calculate_regions(fs);
+// TODO: combine with add_directory_entry?
+int32_t update_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* updated_entry) {
+        uint8_t* current_cluster = stdmem_allocate(fs->bytes_per_sector * fs->sectors_per_cluster); // buffer to read the cluster into
 
+        // Load the first cluster of the directory
+        load_cluster(fs, dir_cluster, current_cluster);
+
+        uint16_t current_cluster_num = dir_cluster;
+        uint16_t previous_cluster_num = 0;
+        int32_t file_index = find_file_in_directory_cluster(fs, current_cluster, &(updated_entry->filename[0]), &(updated_entry->extension[0]));
+        while (file_index == -1) {
+                // Get the next cluster in this directory and load it
+                previous_cluster_num = current_cluster_num;
+                current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+
+                if (current_cluster_num < 0x0002 || current_cluster_num > 0x0fef) {
+                        // We did not find the filename we were looking for anywhere in the directory
+                        return -1;
+                }
+
+                load_cluster(fs, current_cluster_num, current_cluster);
+                file_index = find_file_in_directory_cluster(fs, current_cluster, &(updated_entry->filename[0]), &(updated_entry->extension[0]));
+        }
+
+        current_cluster[file_index] = updated_entry->filename[0] == 0xe5 ? 0x05 : updated_entry->filename[0];
+        for (int i = 1; i < 8; i++) {
+                current_cluster[file_index + i] = updated_entry->filename[i];
+        }
+        for (int i = 0; i < 3; i++) {
+                current_cluster[file_index + 0x08 + i] = updated_entry->extension[i];
+        }
+        current_cluster[file_index + 0x0b] = updated_entry->attributes;
+
+        current_cluster[file_index + 0x1a] = (updated_entry->first_cluster) & 0xFF;
+        current_cluster[file_index + 0x1b] = ((updated_entry->first_cluster)>>8) & 0xFF;
+
+        current_cluster[file_index + 0x1c] = (updated_entry->file_size_bytes) & 0xFF;
+        current_cluster[file_index + 0x1d] = ((updated_entry->file_size_bytes)>>8) & 0xFF;
+        current_cluster[file_index + 0x1e] = ((updated_entry->file_size_bytes)>>16) & 0xFF;
+        current_cluster[file_index + 0x1f] = ((updated_entry->file_size_bytes)>>24) & 0xFF;
+
+        write_cluster(fs, current_cluster_num, current_cluster);
+
+        return 0;
+}
+
+fat16_file_data_t load_file(fat16_t* fs, fat16_dir_entry_t* entry) {
         uint8_t* file_data = stdmem_allocate(entry->file_size_bytes);
         uint32_t file_clusters_written = 0;
+        uint16_t next_cluster = entry->first_cluster;
 
-        if (0x0001 < entry->first_cluster && entry->first_cluster < 0xfff0) {
-
-                load_cluster(fs, entry->first_cluster, &file_data[file_clusters_written * fs->sectors_per_cluster * fs->bytes_per_sector]);
+        while (0x0001 < next_cluster && next_cluster < 0xfff0) {
+                load_cluster(fs, next_cluster, &file_data[file_clusters_written * fs->sectors_per_cluster * fs->bytes_per_sector]);
                 file_clusters_written++;
-
-                uint16_t next_cluster = get_successor_cluster(fs, entry->first_cluster);
-
-                while (0x0001 < next_cluster && next_cluster < 0xfff0) {
-                        load_cluster(fs, next_cluster, &file_data[file_clusters_written * fs->sectors_per_cluster * fs->bytes_per_sector]);
-                        file_clusters_written++;
-                        next_cluster = get_successor_cluster(fs, next_cluster);
-                }
+                next_cluster = get_successor_cluster(fs, next_cluster);
         }
 
         fat16_file_data_t file;
@@ -245,6 +311,89 @@ fat16_file_data_t load_file(fat16_t* fs, fat16_dir_entry_t* entry) {
         file.num_bytes = file_clusters_written * fs->sectors_per_cluster * fs->bytes_per_sector;
 
         return file;
+}
+
+int32_t read_from_file(fat16_t* fs, fat16_dir_entry_t* entry, uint32_t offset_bytes, char* buf, uint32_t num_bytes) {
+        uint32_t bytes_per_cluster = fs->bytes_per_sector * fs->sectors_per_cluster;
+        uint16_t data_starts_in_cluster = offset_bytes / bytes_per_cluster;
+        uint16_t data_offset_in_cluster = offset_bytes - (data_starts_in_cluster * bytes_per_cluster);
+
+        uint8_t* current_cluster_data = stdmem_allocate(fs->sectors_per_cluster * fs->bytes_per_sector);
+
+        uint32_t current_cluster_index = 0; // The index of this cluster chain that we are at
+        uint16_t current_cluster_num = entry->first_cluster; // The cluster number (wrt the filesystem)
+
+        uint32_t num_bytes_read = 0;
+
+        while (0x0001 < current_cluster_num && current_cluster_num < 0xfff0 && current_cluster_index < data_starts_in_cluster) {
+                current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+                current_cluster_index++;
+        }
+
+        load_cluster(fs, current_cluster_num, current_cluster_data);
+
+        uint32_t num_bytes_to_copy_from_first_cluster = (bytes_per_cluster - data_offset_in_cluster) > num_bytes ? num_bytes : bytes_per_cluster - data_offset_in_cluster;
+        stdmem_copy(buf, &current_cluster_data[data_offset_in_cluster], num_bytes_to_copy_from_first_cluster);
+        num_bytes_read += num_bytes_to_copy_from_first_cluster;
+
+        current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+        current_cluster_index++;
+
+        while (0x0001 < current_cluster_num && current_cluster_num < 0xfff0 && num_bytes_read < num_bytes) {
+                load_cluster(fs, current_cluster_num, current_cluster_data);
+
+                uint32_t num_bytes_to_copy_from_cluster = (num_bytes - num_bytes_read) > bytes_per_cluster ? bytes_per_cluster : (num_bytes - num_bytes_read);
+                stdmem_copy(&buf[num_bytes_read], current_cluster_data, num_bytes_to_copy_from_cluster);
+                num_bytes_read += num_bytes_to_copy_from_cluster;
+
+                current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+                current_cluster_index++;
+        }
+
+        return num_bytes_read;
+}
+
+// TODO: expand the file if we run out of space
+int32_t write_to_file(fat16_t* fs, fat16_dir_entry_t* entry, uint32_t offset_bytes, char* buf, uint32_t num_bytes) {
+        uint32_t bytes_per_cluster = fs->bytes_per_sector * fs->sectors_per_cluster;
+        uint16_t data_starts_in_cluster = offset_bytes / bytes_per_cluster;
+        uint16_t data_offset_in_cluster = offset_bytes - (data_starts_in_cluster * bytes_per_cluster);
+
+        uint8_t* current_cluster_data = stdmem_allocate(fs->sectors_per_cluster * fs->bytes_per_sector);
+
+        uint32_t current_cluster_index = 0; // The index of this cluster chain that we are at
+        uint16_t current_cluster_num = entry->first_cluster; // The cluster number (wrt the filesystem)
+
+        uint32_t num_bytes_written = 0;
+
+        while (0x0001 < current_cluster_num && current_cluster_num < 0xfff0 && current_cluster_index < data_starts_in_cluster) {
+                current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+                current_cluster_index++;
+        }
+
+        load_cluster(fs, current_cluster_num, current_cluster_data);
+
+        uint32_t num_bytes_to_write_to_first_cluster = (bytes_per_cluster - data_offset_in_cluster) > num_bytes ? num_bytes : bytes_per_cluster - data_offset_in_cluster;
+        stdmem_copy(&current_cluster_data[data_offset_in_cluster], buf, num_bytes_to_write_to_first_cluster);
+        write_cluster(fs, current_cluster_num, current_cluster_data);
+        num_bytes_written += num_bytes_to_write_to_first_cluster;
+
+        current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+        current_cluster_index++;
+
+        while (0x0001 < current_cluster_num && current_cluster_num < 0xfff0 && num_bytes_written < num_bytes) {
+                load_cluster(fs, current_cluster_num, current_cluster_data);
+
+                uint32_t num_bytes_to_write_to_cluster = (num_bytes - num_bytes_written) > bytes_per_cluster ? bytes_per_cluster : (num_bytes - num_bytes_written);
+                stdmem_copy(current_cluster_data, &buf[num_bytes_written], num_bytes_to_write_to_cluster);
+                write_cluster(fs, current_cluster_num, current_cluster_data);
+                num_bytes_written += num_bytes_to_write_to_cluster;
+
+                current_cluster_num = get_successor_cluster(fs, current_cluster_num);
+                current_cluster_index++;
+        }
+
+        return num_bytes_written;
 }
 
 uint16_t num_clusters_in_chain(fat16_t* fs, uint16_t first_cluster) {
@@ -388,48 +537,20 @@ void debug_fs() {
         }
 }
 
-
-int32_t sys_write(int fd, char *buf, size_t nbytes) {
-        // If printing to stdout
-        if (STDOUT_FILEDESC == fd) {
-                int32_t i;
-                for (i = 0; i < nbytes; i++) {
-                        PL011_putc(UART0, *buf++);
-                }
-                return i;
-        }
-        // Otherwise indicate failure
-        return -1;
-}
-
-int32_t sys_read(int fd, char *buf, size_t nbytes) {
-        // If reading from stdin
-        if (STDIN_FILEDESC == fd) {
-                int32_t i = 0;
-                while (i < nbytes) {
-                        buf[i] = stdstream_pop_char(stdin_buffer);
-                        i++;
-                }
-                return i;
-        }/* else if (is_file_open(fd)) {
-                disk_rd(find_open_file(fd)->start_block, buf, nbytes);
-        }*/ else {
-                return -1;
-        }
-}
-
-void file_initialise() {
-        stdin_buffer = stdstream_initialise_buffer();
-        stdout_buffer = stdstream_initialise_buffer();
-        stderr_buffer = stdstream_initialise_buffer();
-        fs = inspect_file_system();
-        TAILQ_INIT(open_files);
-}
-
 tailq_open_file_t* find_open_file(char* pathname) {
         tailq_open_file_t* open_file;
         TAILQ_FOREACH(open_file, open_files, entries) {
                 if (stdstring_compare(open_file->path, pathname) == 0) {
+                        return open_file;
+                }
+        }
+        return NULL;
+}
+
+tailq_open_file_t* find_open_file_by_fd(filedesc_t fd) {
+        tailq_open_file_t* open_file;
+        TAILQ_FOREACH(open_file, open_files, entries) {
+                if (open_file->fd == fd) {
                         return open_file;
                 }
         }
@@ -693,6 +814,31 @@ int32_t create_new_file(char* pathname) {
         return add_directory_entry(fs, dir->first_cluster, new_file);
 }
 
+
+
+/**
+ * -1 = failure, 0 = success
+ */
+int32_t update_file_details(char* pathname, fat16_dir_entry_t* updated_entry) {
+        tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
+        if (pathname[0] != '/') {
+                return -1;
+        }
+        char* stripped_pathname = &pathname[1];
+
+        // If the directory doesn't exist, fail
+        char* dir_path = to_directory(stripped_pathname);
+        fat16_dir_entry_t* dir = find_dir(dir_path, root_dir);
+        if (dir == NULL) {
+                return -1;
+        }
+
+        char* filename = to_filename(stripped_pathname);
+        fat16_file_name_t file = split_filename(filename);
+
+        return update_directory_entry(fs, dir->first_cluster, updated_entry);
+}
+
 filedesc_t sys_open(char* pathname, int32_t flags) {
 
         // First, see if the file has already been opened
@@ -723,10 +869,73 @@ filedesc_t sys_open(char* pathname, int32_t flags) {
         }
 
         if (flags & O_APPEND) { // Move offset to end of file
-                result->offset = result->directory_entry->file_size_bytes;
-        } else { // Move offset to beginning of file
-                result->offset = 0;
+                result->append = 1;
+        } else {
+                result->append = 0;
         }
 
         return result->fd;
+}
+
+int32_t sys_write(int fd, char *buf, size_t nbytes) {
+        // If printing to stdout
+        if (STDOUT_FILEDESC == fd) {
+                int32_t i;
+                for (i = 0; i < nbytes; i++) {
+                        PL011_putc(UART0, *buf++);
+                }
+                return i;
+        } else {
+                tailq_open_file_t* open_file = find_open_file_by_fd(fd);
+                if (open_file == NULL) {
+                        return -1;
+                } else {
+                        // If the append flag is set, start writing at the end of the file. Else start writing at the current offset.
+                        uint32_t offset = open_file->append ? open_file->directory_entry->file_size_bytes : open_file->offset;
+                        int32_t num_bytes_written = write_to_file(fs, open_file->directory_entry, offset, buf, nbytes);
+                        if (num_bytes_written < 0) {
+                                return -1;
+                        }
+                        // If we have increased the size of the file, update the file metadata and write it to disk
+                        if (offset + num_bytes_written > open_file->directory_entry->file_size_bytes) {
+                                open_file->directory_entry->file_size_bytes = offset + num_bytes_written;
+                                update_file_details(open_file->path, open_file->directory_entry);
+                        }
+
+                        open_file->offset += num_bytes_written;
+                        return num_bytes_written;
+                }
+        }
+}
+
+int32_t sys_read(filedesc_t fd, char *buf, size_t nbytes) {
+        // If reading from stdin
+        if (STDIN_FILEDESC == fd) {
+                int32_t i = 0;
+                while (i < nbytes) {
+                        buf[i] = stdstream_pop_char(stdin_buffer);
+                        i++;
+                }
+                return i;
+        } else {
+                tailq_open_file_t* open_file = find_open_file_by_fd(fd);
+                if (open_file == NULL) {
+                        return -1;
+                } else {
+                        int32_t num_bytes_read = read_from_file(fs, open_file->directory_entry, open_file->offset, buf, nbytes);
+                        if (num_bytes_read < 0) {
+                                return -1;
+                        }
+                        open_file->offset += num_bytes_read;
+                        return num_bytes_read;
+                }
+        }
+}
+
+void file_initialise() {
+        stdin_buffer = stdstream_initialise_buffer();
+        stdout_buffer = stdstream_initialise_buffer();
+        stderr_buffer = stdstream_initialise_buffer();
+        fs = inspect_file_system();
+        TAILQ_INIT(open_files);
 }

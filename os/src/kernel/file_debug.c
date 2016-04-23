@@ -6,6 +6,7 @@ char* path = "/MYFILE1.TXT";
 char* path2 = "/ANOTHER.DOC";
 char* path3 = "/SUBDIR/ASTORY.TXT";
 char* path_new = "/SUBDIR/NEWFILE.DOC";
+char* example_buffer = "The quick brown fox jumps over the lazy dog.";
 
 char* debug_file_list() {
         int32_t result_index = 0;
@@ -28,4 +29,15 @@ char* debug_file_list() {
         }
 
         return debug_result;
+}
+
+char* read_file(filedesc_t fd, int32_t nbytes) {
+        char* buf = stdmem_allocate(nbytes);
+        int32_t nbytes_read = sys_read(fd, buf, nbytes);
+        return buf;
+}
+
+int32_t write_file(filedesc_t fd, char* buf, int32_t nbytes) {
+        int32_t nbytes_written = sys_write(fd, buf, nbytes);
+        return nbytes_written;
 }

@@ -86,6 +86,7 @@ typedef struct tailq_open_file_s {
         fat16_dir_entry_t* directory_entry;
         char* path;
         int32_t offset;
+        bool append;
         TAILQ_ENTRY(tailq_open_file_s) entries;
 } tailq_open_file_t;
 
@@ -93,8 +94,8 @@ TAILQ_HEAD(tailq_open_files_head_s, tailq_open_file_s);
 typedef struct tailq_open_files_head_s tailq_open_files_head_t;
 tailq_open_files_head_t* open_files;
 
-int32_t sys_write(int fd, char *ptr, size_t len);
-int32_t sys_read(int fd, char *ptr, size_t len);
+int32_t sys_write(filedesc_t fd, char *ptr, size_t len);
+int32_t sys_read(filedesc_t fd, char *ptr, size_t len);
 void file_initialise();
 
 filedesc_t sys_open(char* pathname, int32_t flags);
