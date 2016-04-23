@@ -30,6 +30,17 @@ typedef struct fat16_s {
         char file_system_identifier[9];
 } fat16_t;
 
+typedef struct fat16_regions_s {
+        // All numbers are measured in sectors
+        uint32_t fat_region_start;
+        uint32_t root_directory_region_start;
+        uint32_t data_region_start;
+        uint32_t reserved_region_size;
+        uint32_t fat_region_size;
+        uint32_t root_directory_region_size;
+        uint32_t data_region_size;
+} fat16_regions_t;
+
 typedef struct fat16_dir_entry_s {
         char filename[8];
         char extension[3];
@@ -39,10 +50,29 @@ typedef struct fat16_dir_entry_s {
         uint32_t file_size_bytes;
 } fat16_dir_entry_t;
 
-typedef struct fat16_dir_s {
-        fat16_dir_entry_t* entries;
-        int16_t num_entries;
-} fat16_dir_t;
+typedef struct tailq_fat16_dir_entry_s {
+        fat16_dir_entry_t entry;
+        TAILQ_ENTRY(tailq_fat16_dir_entry_s) entries;
+} tailq_fat16_dir_entry_t;
+
+typedef struct fat16_file_attr_s {
+        bool is_read_only;
+        bool is_hidden_file;
+        bool is_system_file;
+        bool is_volume_label;
+        bool is_subdirectory;
+        bool is_archive;
+} fat16_file_attr_t;
+
+typedef struct fat16_file_data_s {
+        uint8_t* data;
+        uint32_t num_bytes;
+} fat16_file_data_t;
+
+typedef struct fat16_file_clusters_s {
+        uint16_t* cluster_address; // Array of cluster addresses
+        uint32_t num_clusters;
+} fat16_file_clusters_t;
 
 int32_t sys_write(int fd, char *ptr, size_t len);
 int32_t sys_read(int fd, char *ptr, size_t len);

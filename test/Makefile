@@ -3,6 +3,8 @@ init-disk :
 	@dd of=disk.bin if=bootsector.bin bs=512 count=1 conv=notrunc
 	@dd of=disk.bin if=initialfat.bin bs=512 count=16 seek=1 conv=notrunc
 	@dd of=disk.bin if=initialroot.bin bs=512 count=32 seek=17 conv=notrunc
+	@dd of=disk.bin if=firstdatacluster.bin bs=512 count=2 seek=49 conv=notrunc
+	@dd of=disk.bin if=seconddatacluster.bin bs=512 count=2 seek=51 conv=notrunc
 
 rm-disk :
 	@rm -f disk.bin

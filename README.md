@@ -14,12 +14,15 @@ MalapropOS has a custom libc called `mlibc`. The implementation of TAILQ is from
 * Dynamic creation and destruction of process with `fork()` and `exit()`
 * A very basic interactive shell, `mμsh`
 * Buffered input, support for `Ctrl+C` in the shell
+* A priority-based scheduling algorithm
+
+### In progress
+
+* Basic FAT16 support
 
 ### Planned
 
-* A priority-based scheduling algorithm
-* IPC
-* A simple file system
+* Message-passing IPC
 
 ## Supported platforms
 
@@ -38,5 +41,6 @@ MalapropOS has a custom libc called `mlibc`. The implementation of TAILQ is from
 
 * `make launch-qemu` launches malapropOS in QEMU, paused before execution
 * `make launch-gdb` launches a GDB session connected to QEMU. Use `c` to continue execution.
+* `make init-disk` initialises the disk, `make launch-disk` launches the disk emulator (which communicates with the OS over UART)
 * `Ctrl+C q Return y Return` will quit GDB
 * `make kill-qemu` will kill QEMU
