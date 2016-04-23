@@ -447,19 +447,25 @@ fat16_file_path_t split_path(char* pathname) {
                         num_parts++;
                 }
         }
+
         char** parts = stdmem_allocate(sizeof(char*)*num_parts);
 
         int part_num = 0;
         int i = 0;
-        while (pathname[i] != '\0') {
+        bool reached_terminator = 0;
+        while (!reached_terminator) {
                 int j = 0;
                 while (pathname[i+j] != '/' && pathname[i+j] != '\0') {
                         j++;
                 }
 
+                if (pathname[i+j] == '\0') {
+                        reached_terminator = 1;
+                }
+
                 parts[part_num] = stdmem_allocate(sizeof(char)*(j+1));
 
-                stdmem_copy(parts[part_num], &pathname[i], j);
+                stdmem_copy(&(parts[part_num][0]), &pathname[i], j);
                 parts[part_num][j] = '\0';
 
                 i += (j + 1);
@@ -644,21 +650,23 @@ tailq_open_file_t* open_file(char* pathname) {
 }
 
 /**
- * -1 = failure, 0 = succes
+ * -1 = failure, 0 = success
  */
 int32_t create_new_file(char* pathname) {
         tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
         if (pathname[0] != '/') {
                 return -1;
         }
+        char* stripped_pathname = &pathname[1];
 
         // If the directory doesn't exist, fail
-        fat16_dir_entry_t* dir = find_dir(to_directory(pathname), root_dir);
+        char* dir_path = to_directory(stripped_pathname);
+        fat16_dir_entry_t* dir = find_dir(dir_path, root_dir);
         if (dir == NULL) {
                 return -1;
         }
 
-        char* filename = to_filename(pathname);
+        char* filename = to_filename(stripped_pathname);
         fat16_file_name_t file = split_filename(filename);
 
         fat16_dir_entry_t* new_file = stdmem_allocate(sizeof(fat16_dir_entry_t));
