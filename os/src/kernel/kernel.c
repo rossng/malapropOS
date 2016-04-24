@@ -162,6 +162,15 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         ctx->gpr[0] = result;
                         break;
                 }
+                case 18 : { // stat
+                        char* path = (char*)(ctx->gpr[0]);
+                        fat16_dir_entry_t* buf = (fat16_dir_entry_t*)(ctx->gpr[1]);
+
+                        int32_t result = sys_stat(path, buf);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
                 case 19 : { // lseek
                         filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
                         int32_t offset = (int32_t)(ctx->gpr[1]);
@@ -178,6 +187,15 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         ctx->gpr[0] = result;
                         break;
                 }
+                case 28 : { // fstat
+                        filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
+                        fat16_dir_entry_t* buf = (fat16_dir_entry_t*)(ctx->gpr[1]);
+
+                        int32_t result = sys_fstat(fd, buf);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
                 case 37 : { // kill
                         pid_t pid = (pid_t)(ctx->gpr[0]);
                         int32_t sig = (int32_t)(ctx->gpr[1]);
@@ -186,6 +204,14 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         if (sig == SIGKILL) {
                                 result = scheduler_kill(ctx, pid);
                         }
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 39 : { // mkdir
+                        char* path = (char*)(ctx->gpr[0]);
+
+                        int32_t result = sys_mkdir(path);
 
                         ctx->gpr[0] = result;
                         break;

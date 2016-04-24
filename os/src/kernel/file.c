@@ -46,30 +46,6 @@ fat16_regions_t calculate_regions(fat16_t* fs) {
         return result;
 }
 
-fat16_file_attr_t unpack_file_attributes(uint8_t attributes_byte) {
-        fat16_file_attr_t result;
-        result.is_read_only = (attributes_byte & 0x01) && 1;
-        result.is_hidden_file = (attributes_byte & 0x02) && 1;
-        result.is_system_file = (attributes_byte & 0x04) && 1;
-        result.is_volume_label = (attributes_byte & 0x08) && 1;
-        result.is_subdirectory = (attributes_byte & 0x10) && 1;
-        result.is_archive = (attributes_byte & 0x20) && 1;
-
-        return result;
-}
-
-uint8_t pack_file_attributes(fat16_file_attr_t attributes) {
-        uint8_t result;
-        if (attributes.is_read_only) { result |= 0x01; }
-        if (attributes.is_hidden_file) { result |= 0x02; }
-        if (attributes.is_system_file) { result |= 0x04; }
-        if (attributes.is_volume_label) { result |= 0x08; }
-        if (attributes.is_subdirectory) { result |= 0x10; }
-        if (attributes.is_archive) { result |= 0x20; }
-
-        return result;
-}
-
 uint16_t get_successor_cluster(fat16_t* fs, uint16_t cluster_number) {
         fat16_regions_t regions = calculate_regions(fs);
 
@@ -143,6 +119,17 @@ int32_t find_first_free_space_in_directory_cluster(fat16_t* fs, uint8_t* cluster
         return -1;
 }
 
+int32_t find_first_free_space_in_root_directory_sector(fat16_t* fs, uint8_t* sector) {
+        uint32_t num_entries = fs->bytes_per_sector / 32;
+
+        for (int i = 0; i < num_entries; i++) {
+                if (sector[i*32] == 0x00 || sector[i*32] == 0xe5) { // Either empty or deleted
+                        return i*32;
+                }
+        }
+        return -1;
+}
+
 /**
  * Finds the specified file in some cluster data and returns the byte index of
  * the beginning of the file's entry. Returns -1 if the file is not found.
@@ -191,6 +178,53 @@ void write_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
         for (int i = 0; i < fs->sectors_per_cluster; i++) {
                 disk_wr(first_sector + i, &buf[i*fs->bytes_per_sector], fs->bytes_per_sector);
         }
+}
+
+int32_t add_root_directory_entry(fat16_t* fs, fat16_dir_entry_t* entry) {
+        uint8_t* current_sector = stdmem_allocate(fs->bytes_per_sector); // buffer to read the cluster into
+
+        fat16_regions_t regions = calculate_regions(fs);
+
+        // Load the first cluster of the directory
+        disk_rd(regions.root_directory_region_start, current_sector, fs->bytes_per_sector);
+
+        uint16_t current_sector_num = regions.root_directory_region_start;
+        int32_t first_space = find_first_free_space_in_root_directory_sector(fs, current_sector);
+        while (first_space == -1) {
+                // Get the next sector in the directory and load it
+                current_sector_num++;
+
+                if (current_sector_num > regions.root_directory_region_size) {
+                        // There is no space left in the root directory
+                        return -1;
+                }
+
+                load_cluster(fs, current_sector_num, current_sector);
+                // Look for a free space in this cluster
+                first_space = find_first_free_space_in_root_directory_sector(fs, current_sector);
+        }
+
+        current_sector[first_space] = entry->filename[0] == 0xe5 ? 0x05 : entry->filename[0];
+        for (int i = 1; i < 8; i++) {
+                current_sector[first_space + i] = entry->filename[i];
+        }
+        for (int i = 0; i < 3; i++) {
+                current_sector[first_space + 0x08 + i] = entry->extension[i];
+        }
+        current_sector[first_space + 0x0b] = entry->attributes;
+
+        current_sector[first_space + 0x1a] = (entry->first_cluster) & 0xFF;
+        current_sector[first_space + 0x1b] = ((entry->first_cluster)>>8) & 0xFF;
+
+        current_sector[first_space + 0x1c] = (entry->file_size_bytes) & 0xFF;
+        current_sector[first_space + 0x1d] = ((entry->file_size_bytes)>>8) & 0xFF;
+        current_sector[first_space + 0x1e] = ((entry->file_size_bytes)>>16) & 0xFF;
+        current_sector[first_space + 0x1f] = ((entry->file_size_bytes)>>24) & 0xFF;
+
+        disk_wr(current_sector_num, current_sector, fs->bytes_per_sector);
+
+        return 0;
+
 }
 
 int32_t add_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* entry) {
@@ -789,21 +823,9 @@ tailq_open_file_t* open_file(char* pathname) {
 /**
  * -1 = failure, 0 = success
  */
-int32_t create_new_file(char* pathname) {
-        tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
-        if (pathname[0] != '/') {
-                return -1;
-        }
-        char* stripped_pathname = &pathname[1];
-
-        // If the directory doesn't exist, fail
-        char* dir_path = to_directory(stripped_pathname);
-        fat16_dir_entry_t* dir = find_dir(dir_path, root_dir);
-        if (dir == NULL) {
-                return -1;
-        }
-
-        char* filename = to_filename(stripped_pathname);
+int32_t create_new_file(char* pathname, uint8_t attributes) {
+        // Create the file entry
+        char* filename = to_filename(pathname);
         fat16_file_name_t file = split_filename(filename);
 
         fat16_dir_entry_t* new_file = stdmem_allocate(sizeof(fat16_dir_entry_t));
@@ -821,16 +843,38 @@ int32_t create_new_file(char* pathname) {
         for (; i < 3; i++) {
                 new_file->extension[i] = 0x20;
         }
-        new_file->attributes = 0;
+        new_file->attributes = attributes;
         new_file->first_cluster = find_first_free_cluster(fs);
         new_file->file_size_bytes = 0;
 
+        // Add it to correct directory
+        tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
+        char* dir_path = to_directory(pathname);
+        if (dir_path[0] == '\0') {
+                // Add to root folder
+                int32_t root_result = add_root_directory_entry(fs, new_file);
+                if (root_result != 0) {
+                        return -1;
+                }
+        } else {
+                // Add to a non-root folder
+
+                // If the directory doesn't exist, fail
+                fat16_dir_entry_t* dir = find_dir(dir_path, root_dir);
+                if (dir == NULL) {
+                        return -1;
+                }
+
+                int32_t dir_result = add_directory_entry(fs, dir->first_cluster, new_file);
+                if (dir_result != 0) {
+                        return -1;
+                }
+        }
+
         set_successor_cluster(fs, new_file->first_cluster, 0xFFFF);
 
-        return add_directory_entry(fs, dir->first_cluster, new_file);
+        return 0;
 }
-
-
 
 /**
  * -1 = failure, 0 = success
@@ -866,7 +910,7 @@ filedesc_t sys_open(char* pathname, int32_t flags) {
                         // If the file doesn't exist on disk but the O_CREAT flag
                         // has been passed, create it
                         if (flags & O_CREAT) {
-                                if (-1 == create_new_file(pathname)) {
+                                if (-1 == create_new_file(pathname, 0x0)) {
                                         // If the file could not be created, fail
                                         return -1;
                                 } else {
@@ -1060,6 +1104,43 @@ char* sys_getcwd(char* buf, size_t nbytes) {
         size_t len = cwd_len > nbytes ? nbytes : cwd_len;
         stdmem_copy(buf, current_working_dir, len);
         return buf;
+}
+
+int32_t sys_stat(char* path, fat16_dir_entry_t* buf) {
+        fat16_dir_entry_t* file = find_file(path, get_root_dir(fs));
+
+        if (file != NULL) {
+                stdmem_copy(buf, file, sizeof(fat16_dir_entry_t));
+                return 0;
+        }
+
+        return -1;
+}
+
+int32_t sys_fstat(filedesc_t fd, fat16_dir_entry_t* buf) {
+        tailq_open_file_t* file = find_open_file_by_fd(fd);
+
+        if (file != NULL) {
+                stdmem_copy(buf, file->directory_entry, sizeof(fat16_dir_entry_t));
+                return 0;
+        }
+        return -1;
+}
+
+int32_t sys_mkdir(char* path) {
+        tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
+        if (path[0] != '/') {
+                return -1;
+        } else if (path[1] == '\0') {
+                return -1;
+        } else {
+                fat16_dir_entry_t* file = find_file(&path[1], root_dir);
+                // If the file already exists:
+                if (file != NULL) {
+                        return -1;
+                }
+        }
+        return create_new_file(path, 0x10);
 }
 
 /**

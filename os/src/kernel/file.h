@@ -52,6 +52,10 @@ int32_t sys_lseek(filedesc_t fd, int32_t offset, int32_t whence);
 tailq_fat16_dir_head_t* sys_getdents(filedesc_t fd, int32_t max_num);
 int32_t sys_chdir(char* path);
 char* sys_getcwd(char* buf, size_t nbytes);
+int32_t sys_mkdir(char* path);
+
+int32_t sys_stat(char* path, fat16_dir_entry_t* buf);
+int32_t sys_fstat(filedesc_t fd, fat16_dir_entry_t* buf);
 
 void file_initialise();
 

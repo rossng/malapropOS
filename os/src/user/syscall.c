@@ -211,7 +211,6 @@ int32_t _chdir(char* path) {
         return r;
 }
 
-
 char* _getcwd(char* buf, size_t nbytes) {
         char* r;
         asm volatile(
@@ -221,6 +220,44 @@ char* _getcwd(char* buf, size_t nbytes) {
                 "mov %0, r0 \n"
                 : "=r" (r)
                 : "r" (buf), "r" (nbytes)
+                : "r0", "r1");
+        return r;
+}
+
+int32_t _stat(char* path, fat16_dir_entry_t* buf) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "svc #18    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (path), "r" (buf)
+                : "r0", "r1");
+        return r;
+}
+
+int32_t _fstat(filedesc_t fd, fat16_dir_entry_t* buf) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "svc #28    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (fd), "r" (buf)
+                : "r0", "r1");
+        return r;
+}
+
+int32_t _mkdir(char* path) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "svc #39    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (path)
                 : "r0", "r1");
         return r;
 }

@@ -67,6 +67,9 @@ typedef struct tailq_open_file_s {
         TAILQ_ENTRY(tailq_open_file_s) entries;
 } tailq_open_file_t;
 
+uint8_t pack_file_attributes(fat16_file_attr_t attributes);
+fat16_file_attr_t unpack_file_attributes(uint8_t attributes_byte);
+
 TAILQ_HEAD(tailq_open_files_head_s, tailq_open_file_s);
 typedef struct tailq_open_files_head_s tailq_open_files_head_t;
 

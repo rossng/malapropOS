@@ -28,6 +28,10 @@ int32_t _lseek(filedesc_t fd, int32_t offset, int32_t whence);
 tailq_fat16_dir_head_t* _getdents(filedesc_t fd, int32_t max_num);
 int32_t _chdir(char* path);
 char* _getcwd(char* buf, size_t nbytes);
+int32_t _mkdir(char* path);
+
+int32_t _stat(char* path, fat16_dir_entry_t* buf);
+int32_t _fstat(filedesc_t fd, fat16_dir_entry_t* buf);
 
 void* _sbrk(int32_t incr);
 

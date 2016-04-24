@@ -6,6 +6,8 @@
 #include "ls.h"
 #include "cd.h"
 #include "pwd.h"
+#include "cat.h"
+#include "mkdir.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -246,6 +248,12 @@ proc_ptr choose_process(char* name) {
         }
         if (stdstring_compare("pwd", name) == 0) {
                 return entry_pwd;
+        }
+        if (stdstring_compare("cat", name) == 0) {
+                return entry_cat;
+        }
+        if (stdstring_compare("mkdir", name) == 0) {
+                return entry_mkdir;
         }
         return NULL;
 }

@@ -24,7 +24,17 @@ void ls(int32_t argc, char* argv[]) {
 
         tailq_fat16_dir_entry_t* directory_entry;
         TAILQ_FOREACH(directory_entry, files, entries) {
+                fat16_file_attr_t attributes = unpack_file_attributes(directory_entry->entry.attributes);
+                if (attributes.is_subdirectory) {
+                        stdio_print("d  ");
+                } else {
+                        stdio_print("f  ");
+                }
                 stdio_print(&(directory_entry->entry.filename[0]));
+                if (directory_entry->entry.extension[0] != '\0') {
+                        stdio_print(".");
+                        stdio_print(&(directory_entry->entry.extension[0]));
+                }
                 stdio_print("\n");
         }
 
