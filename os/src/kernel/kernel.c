@@ -84,7 +84,10 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         break;
                 }
                 case 2 : { // fork
-                        pid_t result = scheduler_fork(ctx);
+                        uint32_t sp = (uint32_t)(ctx->gpr[0]);
+                        uint32_t fp = (uint32_t)(ctx->gpr[1]);
+
+                        pid_t result = scheduler_fork(ctx, sp, fp);
 
                         ctx->gpr[0] = result;
                         break;

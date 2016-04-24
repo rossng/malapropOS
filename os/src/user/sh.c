@@ -36,21 +36,32 @@ char get_next_char() {
 
 // See http://brennan.io/2015/01/16/write-a-shell-in-c/ for more info on basic shell implementation
 void launch_process(proc_ptr function, int32_t argc, char* argv[], int32_t priority) {
-        pid_t fork_pid = _fork();
-        int32_t status;
+        pid_t* stored_pid = stdmem_allocate(sizeof(pid_t));
+        uint32_t fp;
+        asm volatile(
+                "mov %0, r11 \n"
+                : "=r" (fp)
+                :
+                : "r0"
+        );
+        int32_t fork_pid = _fork(fp);
         if (fork_pid == 0) {
                 // If this is the child process, exec the new process
                 _exec(function, argc, argv);
         } else {
+                *stored_pid = fork_pid;
+                // Force the child process to _exec() so it doesn't screw with our stack (kludge!)
+                //_yield(); _yield();
+
                 // Otherwise, wait for the child to complete
-                pid_t child_pid = fork_pid;
-                _setpriority(child_pid, 1, priority); // TODO: should really get the current pid dynamically (1 is a magic number)
+                _setpriority(*stored_pid, 1, priority); // TODO: should really get the current pid dynamically (1 is a magic number)
+
                 pid_t result = 0;
                 bool waiting = 1;
                 do {
-                        result = _waitpid(PROCESS_EVENT_EXITED, child_pid, WAITPID_NOHANG);
+                        result = _waitpid(PROCESS_EVENT_EXITED, *stored_pid, WAITPID_NOHANG);
                         if (!result) {
-                                handle_input(child_pid);
+                                handle_input(*stored_pid);
                                 _yield();
                         } else {
                                 waiting = 0;
@@ -64,7 +75,14 @@ void launch_process_bg(proc_ptr function, int32_t argc, char* argv[]) {
         // Both copying the stack and COW are too complicated, just store the argument in a global
         // so it's preserved on both sides of the fork. Obviously going to be some nasty race conditions here.
         bg_process = function;
-        pid_t fork_pid = _fork();
+        uint32_t fp;
+        asm volatile(
+                "mov %0, r11 \n"
+                : "=r" (fp)
+                :
+                : "r0"
+        );
+        int32_t fork_pid = _fork(fp);
         if (fork_pid == 0) {
                 _exec(bg_process, argc, argv);
         } else {
@@ -77,9 +95,9 @@ void launch_process_bg(proc_ptr function, int32_t argc, char* argv[]) {
                 // If we are at the top of the process queue, a call to yield may
                 // schedule this process again, so first get us to the back of the
                 // queue
-                _yield();
+                //_yield();
                 // Then let the other process take over
-                _yield();
+                //_yield();
         }
 }
 

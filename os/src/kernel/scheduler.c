@@ -299,7 +299,7 @@ int32_t scheduler_setpriority(ctx_t* ctx, pid_t pid, int32_t priority) {
  * Duplicate the current process with a new PID.
  * @return the new PID if fork is successful, -1 if forking fails
  */
-pid_t scheduler_fork(ctx_t* ctx) {
+pid_t scheduler_fork(ctx_t* ctx, uint32_t sp, uint32_t fp) {
         if (current_pid < 1) {
                 PL011_puts(UART0, "Scheduler: no process currently executing\n", 42);
         } else {
@@ -307,12 +307,22 @@ pid_t scheduler_fork(ctx_t* ctx) {
                 // and stack pointer
                 tailq_pcb_t *new_process = stdmem_allocate(sizeof(tailq_pcb_t));
                 pid_t new_pid = get_new_pid();
+                void* new_break = set_stack_break(2000);
                 pcb_t* process_to_copy = find_process(current_pid);
                 copy_pcb(&(new_process->pcb), process_to_copy);
                 copy_ctx(&(new_process->pcb.ctx), ctx);
                 new_process->pcb.pid = new_pid;
                 new_process->pcb.status = PROCESS_STATUS_READY;
                 new_process->pcb.ctx.gpr[0] = 0; // The child process should receive 0 from the fork call
+                new_process->pcb.ctx.gpr[11] = ((uint32_t)new_break) - (fp - ctx->gpr[11]); // New current frame pointer
+                new_process->pcb.ctx.sp = ((uint32_t) new_break) - (fp - sp); // New stack pointer
+                stdmem_copy((void*)new_process->pcb.ctx.sp, (void*)sp, fp - sp); // Copy the frame
+
+                /*// Now add another frame to simulate returning from the syscall - this is pretty fragile
+                uint32_t previous_fp = new_process->pcb.ctx.gpr[11];
+                new_process->pcb.ctx.gpr[11] = new_process->pcb.ctx.sp;
+                new_process->pcb.ctx.sp -= 4;
+                *((uint32_t*)new_process->pcb.ctx.sp) = previous_fp; // Store the saved fp into the new frame*/
 
                 TAILQ_INSERT_TAIL(&process_list, new_process, entries);
 
@@ -340,12 +350,11 @@ pid_t scheduler_getpid(ctx_t* ctx) {
  * @return the pid of the new process
  */
 pid_t scheduler_exec(ctx_t* ctx, proc_ptr function, int32_t argc, char* argv[]) {
-        void* new_sp = set_stack_break(2000);
         ctx->pc = (uint32_t)(function);
         ctx->gpr[0] = argc;
         ctx->gpr[1] = (uint32_t)argv;
-        ctx->gpr[11] = (uint32_t) new_sp; // Frame pointer
-        ctx->sp = (uint32_t) new_sp;
+        //ctx->gpr[11] = (uint32_t) new_sp; // Frame pointer
+        //ctx->sp = (uint32_t) new_sp;
         //ctx->sp = (uint32_t)(set_stack_break(1000));
         save_current_process(ctx);
         pcb_t* current_process = find_process(current_pid);

@@ -13,14 +13,16 @@ void _exit(int status) {
                 : "r0");
 }
 
-pid_t _fork() {
+pid_t _fork(uint32_t fp) {
         pid_t r;
         asm volatile(
+                "mov r0, sp \n"
+                "mov r1, %1 \n"
                 "svc #2 \n"
                 "mov %0, r0 \n"
                 : "=r" (r)
-                :
-                : "r0"
+                : "r" (fp)
+                : "r0", "r1"
         );
         return r;
 }

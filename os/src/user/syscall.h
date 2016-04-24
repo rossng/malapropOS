@@ -10,7 +10,7 @@
 
 void _yield(void);
 void _exit(procres_t result);
-pid_t _fork(void);
+pid_t _fork(uint32_t fp);
 pid_t _getpid(void);
 pid_t _waitpid(procevent_t event, pid_t pid, int32_t options);
 void _exec(proc_ptr function, int32_t argc, char* argv[]);

@@ -45,7 +45,7 @@ typedef struct tailq_event_s {
 void scheduler_initialise(ctx_t* ctx);
 void scheduler_run(ctx_t* ctx);
 void scheduler_exit(ctx_t* ctx);
-pid_t scheduler_fork(ctx_t* ctx);
+pid_t scheduler_fork(ctx_t* ctx, uint32_t sp, uint32_t fp);
 int32_t scheduler_kill(ctx_t* ctx, pid_t pid);
 pid_t scheduler_getpid(ctx_t* ctx);
 int32_t scheduler_setpriority(ctx_t* ctx, pid_t which, int32_t priority);
