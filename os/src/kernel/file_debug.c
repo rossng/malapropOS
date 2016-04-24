@@ -6,6 +6,7 @@ char* path = "/MYFILE1.TXT";
 char* path2 = "/ANOTHER.DOC";
 char* path3 = "/SUBDIR/ASTORY.TXT";
 char* path_new = "/SUBDIR/NEWFILE.DOC";
+char* path_dir = "/SUBDIR";
 char* example_buffer = "The quick brown fox jumps over the lazy dog.";
 
 char* debug_file_list() {

@@ -6,9 +6,6 @@ struct tailq_stream_head* stdin_buffer;
 struct tailq_stream_head* stdout_buffer;
 struct tailq_stream_head* stderr_buffer;
 
-TAILQ_HEAD(tailq_fat16_dir_head_s, tailq_fat16_dir_entry_s);
-typedef struct tailq_fat16_dir_head_s tailq_fat16_dir_head_t;
-
 filedesc_t next_fd = 3;
 
 fat16_t* fs;
@@ -439,7 +436,7 @@ bool add_sector_dir_entries_to_list(fat16_t* fs, uint8_t* sector, tailq_fat16_di
                                list_entry->entry.filename[0] = 0xe5;
                         }
                         for (int k = 0; k < 3; k++) {
-                                list_entry->entry.extension[k] = sector[entry_bytes*j + 0x08 + k];
+                                list_entry->entry.extension[k] = sector[entry_bytes*j + 0x08 + k] == 0x20 ? '\0' : sector[entry_bytes*j + 0x08 + k];
                         }
                         list_entry->entry.extension[4] = '\0';
                         list_entry->entry.attributes = sector[entry_bytes*j + 0x0b];
@@ -677,6 +674,7 @@ fat16_dir_entry_t* find_file(char* pathname, tailq_fat16_dir_head_t* dir) {
         fat16_dir_entry_t* result = NULL;
 
         fat16_file_path_t path = split_path(pathname);
+        fat16_file_name_t filename = split_filename(path.parts[0]);
 
         if (path.num_parts > 1) {
                 // Search for next directory in the path
@@ -684,7 +682,7 @@ fat16_dir_entry_t* find_file(char* pathname, tailq_fat16_dir_head_t* dir) {
                 TAILQ_FOREACH(dir_entry, dir, entries) {
                         fat16_file_attr_t attributes = unpack_file_attributes(dir_entry->entry.attributes);
                         if (attributes.is_subdirectory) {
-                                if (stdstring_compare(path.parts[0], &(dir_entry->entry.filename[0])) == 0) { // TODO: extensions
+                                if (stdstring_compare(filename.name, &(dir_entry->entry.filename[0])) == 0 && stdstring_compare(filename.extension, &(dir_entry->entry.extension[0])) == 0) {
                                         tailq_fat16_dir_head_t* next_dir = get_dir(fs, &(dir_entry->entry));
                                         if (next_dir != NULL) {
                                                 result = find_file(descend_path(pathname), next_dir);
@@ -696,12 +694,8 @@ fat16_dir_entry_t* find_file(char* pathname, tailq_fat16_dir_head_t* dir) {
         } else if (path.num_parts == 1) {
                 // Search for a file in this directory
                 tailq_fat16_dir_entry_t* file_entry;
-                fat16_file_name_t filename = split_filename(path.parts[0]);
                 TAILQ_FOREACH(file_entry, dir, entries) {
                         fat16_file_attr_t attributes = unpack_file_attributes(file_entry->entry.attributes);
-                        if (attributes.is_subdirectory) {
-                                continue;
-                        }
                         if (stdstring_compare(filename.name, &(file_entry->entry.filename[0])) == 0 && stdstring_compare(filename.extension, &(file_entry->entry.extension[0])) == 0) {
                                 return &file_entry->entry;
                         }
@@ -991,6 +985,15 @@ int32_t sys_lseek(filedesc_t fd, int32_t offset, int32_t whence) {
                         }
                 }
         }
+}
+
+tailq_fat16_dir_head_t* sys_getdents(filedesc_t fd, int32_t max_num) {
+        tailq_open_file_t* open_directory = find_open_file_by_fd(fd);
+        if (open_directory == NULL) {
+                return NULL;
+        }
+
+        return get_dir(fs, open_directory->directory_entry);
 }
 
 /**

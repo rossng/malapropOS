@@ -181,3 +181,16 @@ int32_t _unlink(char* pathname) {
                 : "r0");
         return r;
 }
+
+tailq_fat16_dir_head_t* _getdents(filedesc_t fd, int32_t max_num) {
+        tailq_fat16_dir_head_t* r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "svc #141     \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (fd), "r" (max_num)
+                : "r0", "r1");
+        return r;
+}

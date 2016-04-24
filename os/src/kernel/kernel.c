@@ -189,6 +189,15 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         ctx->gpr[0] = result;
                         break;
                 }
+                case 141 : { // getdents (modified)
+                        filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
+                        int32_t max_num = (int32_t)(ctx->gpr[1]);
+
+                        tailq_fat16_dir_head_t* result = sys_getdents(fd, max_num);
+
+                        ctx->gpr[0] = (int32_t)result;
+                        break;
+                }
                 case 158 : { // yield
                         scheduler_run(ctx);
                         break;

@@ -38,60 +38,6 @@ typedef struct fat16_regions_s {
         uint32_t data_region_size;
 } fat16_regions_t;
 
-typedef struct fat16_dir_entry_s {
-        char filename[9];
-        char extension[4];
-        uint8_t attributes;
-        // Ignore updated and created dates
-        uint16_t first_cluster;
-        uint32_t file_size_bytes;
-} fat16_dir_entry_t;
-
-typedef struct tailq_fat16_dir_entry_s {
-        fat16_dir_entry_t entry;
-        TAILQ_ENTRY(tailq_fat16_dir_entry_s) entries;
-} tailq_fat16_dir_entry_t;
-
-typedef struct fat16_file_attr_s {
-        bool is_read_only;
-        bool is_hidden_file;
-        bool is_system_file;
-        bool is_volume_label;
-        bool is_subdirectory;
-        bool is_archive;
-} fat16_file_attr_t;
-
-typedef struct fat16_file_data_s {
-        uint8_t* data;
-        uint32_t num_bytes;
-} fat16_file_data_t;
-
-typedef struct fat16_file_clusters_s {
-        uint16_t* cluster_address; // Array of cluster addresses
-        uint32_t num_clusters;
-} fat16_file_clusters_t;
-
-typedef struct fat16_file_path_s {
-        char** parts;
-        uint32_t num_parts;
-} fat16_file_path_t;
-
-typedef struct fat16_file_name_s {
-        char* name;
-        char* extension;
-} fat16_file_name_t;
-
-typedef struct tailq_open_file_s {
-        filedesc_t fd;
-        fat16_dir_entry_t* directory_entry;
-        char* path;
-        int32_t offset;
-        bool append;
-        TAILQ_ENTRY(tailq_open_file_s) entries;
-} tailq_open_file_t;
-
-TAILQ_HEAD(tailq_open_files_head_s, tailq_open_file_s);
-typedef struct tailq_open_files_head_s tailq_open_files_head_t;
 tailq_open_files_head_t* open_files;
 
 int32_t sys_write(filedesc_t fd, char *ptr, size_t len);
@@ -101,6 +47,7 @@ filedesc_t sys_open(char* pathname, int32_t flags);
 int32_t sys_close(filedesc_t fd);
 int32_t sys_unlink(char* pathname);
 int32_t sys_lseek(filedesc_t fd, int32_t offset, int32_t whence);
+tailq_fat16_dir_head_t* sys_getdents(filedesc_t fd, int32_t max_num);
 
 void file_initialise();
 
