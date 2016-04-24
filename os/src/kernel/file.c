@@ -559,6 +559,10 @@ fat16_file_path_t split_path(char* pathname) {
                 pathname = &pathname[1];
         }
 
+        if (pathname[1] == '\0') {
+                return (fat16_file_path_t){NULL, 0};
+        }
+
         int32_t num_parts = 1;
         for (int i = 0; i < stdstring_length(pathname); i++) {
                 if (pathname[i] == '/') {
@@ -748,6 +752,24 @@ tailq_open_file_t* open_file(char* pathname) {
         tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
         if (pathname[0] != '/') {
                 return NULL;
+        } else if (pathname[1] == '\0') {
+                // If we are opening the root directory - bit of a hack :s
+                fat16_dir_entry_t* root = stdmem_allocate(sizeof(fat16_dir_entry_t));
+                root->filename[0] = '/';
+                root->filename[1] = '\0';
+                root->extension[0] = '\0';
+                root->attributes = 0x10;
+                root->first_cluster = 0;
+                fat16_regions_t regions = calculate_regions(fs);
+                root->file_size_bytes = regions.root_directory_region_size * fs->bytes_per_sector; // Should really be calculated from number of entries
+
+                tailq_open_file_t* opened_root = stdmem_allocate(sizeof(tailq_open_file_t));
+                opened_root->directory_entry = root;
+                opened_root->fd = get_next_filedesc();
+                opened_root->offset = 0;
+                opened_root->path = pathname;
+                TAILQ_INSERT_TAIL(open_files, opened_root, entries);
+                return opened_root;
         } else {
                 fat16_dir_entry_t* file = find_file(&pathname[1], root_dir);
                 if (file == NULL) {
@@ -884,6 +906,10 @@ int32_t sys_write(int fd, char *buf, size_t nbytes) {
                 if (open_file == NULL) {
                         return -1;
                 } else {
+                        fat16_file_attr_t attributes = unpack_file_attributes(open_file->directory_entry->attributes);
+                        if (attributes.is_subdirectory) {
+                                return -1; // Cannot write directly to a directory
+                        }
                         // If the append flag is set, start writing at the end of the file. Else start writing at the current offset.
                         if (open_file->append) {
                                 open_file->offset = open_file->directory_entry->file_size_bytes;
@@ -918,6 +944,11 @@ int32_t sys_read(filedesc_t fd, char *buf, size_t nbytes) {
                 if (open_file == NULL) {
                         return -1;
                 } else {
+                        if (open_file->directory_entry->first_cluster < 2) {
+                                // This is the root directory - don't allow direct reads
+                                // because the static sector allocation makes this really complicated
+                                return -1;
+                        }
                         int32_t num_bytes_read = read_from_file(fs, open_file->directory_entry, open_file->offset, buf, nbytes);
                         if (num_bytes_read < 0) {
                                 return -1;
@@ -991,6 +1022,11 @@ tailq_fat16_dir_head_t* sys_getdents(filedesc_t fd, int32_t max_num) {
         tailq_open_file_t* open_directory = find_open_file_by_fd(fd);
         if (open_directory == NULL) {
                 return NULL;
+        }
+
+        // If this is the root directory
+        if (open_directory->directory_entry->first_cluster < 2) {
+                return get_root_dir(fs);
         }
 
         return get_dir(fs, open_directory->directory_entry);
