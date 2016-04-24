@@ -3,7 +3,8 @@
 
 #include <stddef.h>
 #include <stdtypes.h>
+#include <stdproc.h>
 
-extern void (*entry_P0)();
+extern proc_ptr entry_P0;
 
 #endif

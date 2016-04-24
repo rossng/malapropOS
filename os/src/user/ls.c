@@ -1,13 +1,12 @@
-#include "P2.h"
+#include "ls.h"
 #include <stddef.h>
 #include <stdtypes.h>
 #include <stdio.h>
-#include <stdproc.h>
 #include <stdfile.h>
 #include <syscall.h>
 
-void P2() {
-        filedesc_t root = _open("/", O_CREAT);
+void ls(int32_t argc, char* argv[]) {
+        filedesc_t root = _open(argv[0], O_CREAT);
         tailq_fat16_dir_head_t* files = _getdents(root, 100);
 
         tailq_fat16_dir_entry_t* directory_entry;
@@ -19,4 +18,4 @@ void P2() {
         stdproc_exit(EXIT_SUCCESS);
 }
 
-void (*entry_P2)() = &P2;
+proc_ptr entry_ls = &ls;

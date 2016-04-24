@@ -33,4 +33,6 @@ void stdproc_exit(procres_t result);
 pid_t stdproc_fork(void);
 pid_t stdproc_getpid(void);
 
+typedef void (*proc_ptr)(int32_t, char**);
+
 #endif

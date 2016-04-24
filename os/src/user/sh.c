@@ -3,7 +3,7 @@
 #include "sh.h"
 #include "P0.h"
 #include "P1.h"
-#include "P2.h"
+#include "ls.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -35,12 +35,12 @@ char get_next_char() {
 }
 
 // See http://brennan.io/2015/01/16/write-a-shell-in-c/ for more info on basic shell implementation
-void launch_process(void (*function)(), int32_t priority) {
+void launch_process(proc_ptr function, int32_t argc, char* argv[], int32_t priority) {
         pid_t fork_pid = _fork();
         int32_t status;
         if (fork_pid == 0) {
                 // If this is the child process, exec the new process
-                _exec(function);
+                _exec(function, argc, argv);
         } else {
                 // Otherwise, wait for the child to complete
                 pid_t child_pid = fork_pid;
@@ -60,13 +60,13 @@ void launch_process(void (*function)(), int32_t priority) {
 }
 
 void (*bg_process)();
-void launch_process_bg(void (*function)()) {
+void launch_process_bg(proc_ptr function, int32_t argc, char* argv[]) {
         // Both copying the stack and COW are too complicated, just store the argument in a global
         // so it's preserved on both sides of the fork. Obviously going to be some nasty race conditions here.
         bg_process = function;
         pid_t fork_pid = _fork();
         if (fork_pid == 0) {
-                _exec(bg_process);
+                _exec(bg_process, argc, argv);
         } else {
                 // The parent may get rescheduled first, in which case we must
                 // immediately yield() to let the the child process exec() and
@@ -204,40 +204,42 @@ void mush() {
                         if (token->after_token != NULL) {
                                 token = stdstring_next_token(token->after_token, " ");
                                 if (stdstring_compare(token->token_start, "&") == 0) { // Background, low priority
-                                        launch_process_bg(entry_P0);
+                                        launch_process_bg(entry_P0, 0, NULL);
                                 } else if (stdstring_compare(token->token_start, "!") == 0) { // Foreground, high priority
-                                        launch_process(entry_P0, 0);
+                                        launch_process(entry_P0, 0, NULL, 0);
                                 } else {
                                         stdio_print("Invalid launch options\n");
                                 }
                         } else { // Foreground, low priority
-                                launch_process(entry_P0, 1);
+                                launch_process(entry_P0, 0, NULL, 1);
                         }
                 } else if (stdstring_compare(token->token_start, "P1") == 0) {
                         if (token->after_token != NULL) {
                                 token = stdstring_next_token(token->after_token, " ");
                                 if (stdstring_compare(token->token_start, "&") == 0) {
-                                        launch_process_bg(entry_P1);
+                                        launch_process_bg(entry_P1, 0, NULL);
                                 } else if (stdstring_compare(token->token_start, "!") == 0) {
-                                        launch_process(entry_P1, 0);
+                                        launch_process(entry_P1, 0, NULL, 0);
                                 } else {
                                         stdio_print("Invalid launch options\n");
                                 }
                         } else {
-                                launch_process(entry_P1, 1);
+                                launch_process(entry_P1, 0, NULL, 1);
                         }
-                } else if (stdstring_compare(token->token_start, "P2") == 0) {
+                } else if (stdstring_compare(token->token_start, "ls") == 0) {
+                        char* argv[1];
+                        argv[0] = "/";
                         if (token->after_token != NULL) {
                                 token = stdstring_next_token(token->after_token, " ");
                                 if (stdstring_compare(token->token_start, "&") == 0) {
-                                        launch_process_bg(entry_P2);
+                                        launch_process_bg(entry_ls, 1, argv);
                                 } else if (stdstring_compare(token->token_start, "!") == 0) {
-                                        launch_process(entry_P2, 0);
+                                        launch_process(entry_ls, 1, argv, 0);
                                 } else {
                                         stdio_print("Invalid launch options\n");
                                 }
                         } else {
-                                launch_process(entry_P2, 1);
+                                launch_process(entry_ls, 1, argv, 1);
                         }
                 } else if (stdstring_length(token->token_start) == 0) {
                         continue;

@@ -1,9 +1,8 @@
 #include "P0.h"
 #include <stddef.h>
 #include <stdio.h>
-#include <stdproc.h>
 
-void P0() {
+void P0(int32_t argc, char* argv[]) {
         while (1) {
                 int i;
                 for (i = 0; i < 5; i++) {
@@ -18,4 +17,4 @@ void P0() {
         }
 }
 
-void (*entry_P0)() = &P0;
+proc_ptr entry_P0 = &P0;

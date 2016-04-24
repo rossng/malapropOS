@@ -1,12 +1,11 @@
 #include "P1.h"
-#include <stdproc.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdproc.h>
 
 pid_t num_launches = 0;
 
-void P1() {
+void P1(int32_t argc, char* argv[]) {
         while (1) {
                 for (int i = 0; i < 5; i++) {
                         stdio_print("P1: ");
@@ -20,4 +19,4 @@ void P1() {
         }
 }
 
-void (*entry_P1)() = &P1;
+proc_ptr entry_P1 = &P1;

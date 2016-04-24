@@ -203,9 +203,11 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         break;
                 }
                 case 1000 : { // non-standard exec
-                        void (*function)() = (void (*)(void *)) ctx->gpr[0];
+                        proc_ptr function = (proc_ptr)(ctx->gpr[0]);
+                        int32_t argc = (int32_t)(ctx->gpr[1]);
+                        char** argv = (char**)(ctx->gpr[2]);
 
-                        scheduler_exec(ctx, function);
+                        scheduler_exec(ctx, function, argc, argv);
 
                         break;
                 }

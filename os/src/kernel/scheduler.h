@@ -53,7 +53,7 @@ pid_t scheduler_block_process(ctx_t* ctx, event_t until_event);
 pid_t scheduler_has_event_occurred(ctx_t* ctx, event_t event);
 pid_t scheduler_new_process(ctx_t* ctx, void (*function)());
 void scheduler_emit_event(event_t event);
-pid_t scheduler_exec(ctx_t* ctx, void (*function)());
+pid_t scheduler_exec(ctx_t* ctx, proc_ptr function, int32_t argc, char* argv[]);
 void copy_pcb(pcb_t* destination, pcb_t* source);
 void copy_ctx(ctx_t* destination, ctx_t* source);
 void copy_event(event_t* destination, event_t* source);

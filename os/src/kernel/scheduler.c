@@ -339,9 +339,11 @@ pid_t scheduler_getpid(ctx_t* ctx) {
  * Create a new process from the function provided.
  * @return the pid of the new process
  */
-pid_t scheduler_exec(ctx_t* ctx, void (*function)()) {
+pid_t scheduler_exec(ctx_t* ctx, proc_ptr function, int32_t argc, char* argv[]) {
         void* new_sp = set_stack_break(2000);
         ctx->pc = (uint32_t)(function);
+        ctx->gpr[0] = argc;
+        ctx->gpr[1] = (uint32_t)argv;
         ctx->gpr[11] = (uint32_t) new_sp; // Frame pointer
         ctx->sp = (uint32_t) new_sp;
         //ctx->sp = (uint32_t)(set_stack_break(1000));
