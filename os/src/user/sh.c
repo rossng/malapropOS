@@ -50,8 +50,6 @@ void launch_process(proc_ptr function, int32_t argc, char* argv[], int32_t prior
                 _exec(function, argc, argv);
         } else {
                 *stored_pid = fork_pid;
-                // Force the child process to _exec() so it doesn't screw with our stack (kludge!)
-                //_yield(); _yield();
 
                 // Otherwise, wait for the child to complete
                 _setpriority(*stored_pid, 1, priority); // TODO: should really get the current pid dynamically (1 is a magic number)
@@ -86,18 +84,6 @@ void launch_process_bg(proc_ptr function, int32_t argc, char* argv[]) {
         if (fork_pid == 0) {
                 _exec(bg_process, argc, argv);
         } else {
-                // The parent may get rescheduled first, in which case we must
-                // immediately yield() to let the the child process exec() and
-                // get a new stack - otherwise the child process will overwrite
-                // values in the parent stack when it returns from _fork().
-                // This is a bit of a hack, but necessitated by the fact we don't
-                // have copy-on-write.
-                // If we are at the top of the process queue, a call to yield may
-                // schedule this process again, so first get us to the back of the
-                // queue
-                //_yield();
-                // Then let the other process take over
-                //_yield();
         }
 }
 

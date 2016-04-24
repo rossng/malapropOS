@@ -15,10 +15,11 @@ MalapropOS has a custom libc called `mlibc`. The implementation of TAILQ is from
 * A very basic interactive shell, `mμsh`
 * Buffered input, support for `Ctrl+C` in the shell
 * A priority-based scheduling algorithm
+* Basic FAT16 support
 
 ### In progress
 
-* Basic FAT16 support
+* Basic shell utilities: cd, ls, cat
 
 ### Planned
 
