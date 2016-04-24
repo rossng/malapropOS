@@ -410,9 +410,15 @@ char* ready = "READY";
 char* blocked = "BLOCKED";
 char* terminated = "TERMINATED";
 
+char* exited = "EXITED";
+char* suspended = "SUSPENDED";
+char* unsuspended = "UNSUSPENDED";
+char* unblocked = "UNBLOCKED";
+char* created = "CREATED";
+
 char debug_result[200];
 
-char* debug_list_processes() {
+char* debug_process_list() {
         int32_t result_index = 0;
         result_index = stdstring_append(debug_result, result_index, "Processes: ");
 
@@ -430,6 +436,32 @@ char* debug_list_processes() {
                         case PROCESS_STATUS_TERMINATED : { result_index = stdstring_append(debug_result, result_index, terminated); break; }
                 }
 
+                result_index = stdstring_append(debug_result, result_index, "} ");
+        }
+
+        return debug_result;
+}
+
+char* debug_event_list() {
+        int32_t result_index = 0;
+        result_index = stdstring_append(debug_result, result_index, "Events: ");
+
+        tailq_event_t* item;
+        char* tmp = stdmem_allocate(sizeof(char)*15);
+        TAILQ_FOREACH(item, &events_head, entries) {
+                result_index = stdstring_append(debug_result, result_index, "{");
+                switch (item->event.event) {
+                        case PROCESS_EVENT_EXITED : { result_index = stdstring_append(debug_result, result_index, exited); break; }
+                        case PROCESS_EVENT_SUSPENDED : { result_index = stdstring_append(debug_result, result_index, suspended); break; }
+                        case PROCESS_EVENT_UNSUSPENDED : { result_index = stdstring_append(debug_result, result_index, unsuspended); break; }
+                        case PROCESS_EVENT_BLOCKED : { result_index = stdstring_append(debug_result, result_index, blocked); break; }
+                        case PROCESS_EVENT_UNBLOCKED : { result_index = stdstring_append(debug_result, result_index, unblocked); break; }
+                        case PROCESS_EVENT_CREATED : { result_index = stdstring_append(debug_result, result_index, created); break; }
+                }
+
+                result_index = stdstring_append(debug_result, result_index, ", ");
+                stdstring_int_to_str(item->event.from_process, tmp);
+                result_index = stdstring_append(debug_result, result_index, tmp);
                 result_index = stdstring_append(debug_result, result_index, "} ");
         }
 
