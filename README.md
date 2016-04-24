@@ -103,12 +103,23 @@ Display the contents of a file. At the moment, only absolute paths are accepted.
 
 Example: `cat /MYFILE1.TXT`
 
-### Not yet implemented: `touch`
+### `touch`
+Creates a file if it does not already exist. At the moment, only absolute paths are accepted.
 
-### Not yet implemented: `write`
+Example: `touch /STORY.TXT`
 
-### Not yet implemented: `rm`
+### `write`, `append`
+Write the phrase following the filename to the file. At the moment, only absolute paths are accepted. `write` writes from the beginning of the file, `append` from the end.
+
+Example: `write /STORY.TXT Once upon` followed by `append /STORY.TXT a time` will leave the file containing 'Once upon a time'
+
+### `rm`
+Remove the specified file. At the moment, only absolute paths are accepted.
+
+Example: `rm /MYFILE1.TXT`
 
 ## Acknowledgements
 
-The implementation of TAILQ is from FreeBSD. The implementation of `stdarg.h` is from GCC.
+The implementation of TAILQ is from FreeBSD.
+
+The implementation of `stdarg.h` is from GCC.

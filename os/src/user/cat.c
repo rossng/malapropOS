@@ -8,6 +8,7 @@
 void cat(int32_t argc, char* argv[]) {
         if (argc == 1) {
                 filedesc_t fd = _open(argv[0], 0);
+                _lseek(fd, 0, SEEK_SET);
                 fat16_dir_entry_t* file_entry = stdmem_allocate(sizeof(fat16_dir_entry_t));
                 if (_fstat(fd, file_entry) != 0) {
                         stdio_print("File not found.\n");

@@ -199,6 +199,20 @@ tailq_fat16_dir_head_t* _getdents(filedesc_t fd, int32_t max_num) {
         return r;
 }
 
+int32_t _lseek(filedesc_t fd, int32_t offset, int32_t whence) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "svc #19    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (fd), "r" (offset), "r" (whence)
+                : "r0", "r1", "r2");
+        return r;
+}
+
 int32_t _chdir(char* path) {
         int32_t r;
         asm volatile(

@@ -159,6 +159,34 @@ int32_t find_file_in_directory_cluster(fat16_t* fs, uint8_t* cluster, char* file
         return -1;
 }
 
+/**
+ * Finds the specified file in some sector data and returns the byte index of
+ * the beginning of the file's entry. Returns -1 if the file is not found.
+ */
+int32_t find_file_in_root_directory_sector(fat16_t* fs, uint8_t* sector, char* filename, char* extension) {
+        uint32_t num_entries = fs->bytes_per_sector / 32;
+
+        for (int i = 0; i < num_entries; i++) {
+                bool matches = 1;
+                // Compare the filename
+                for (int j = 0; j < 8; j++) {
+                        if (sector[i*32 + j] == 0x20 && filename[j] == '\0') {
+                                break;
+                        }
+                        matches &= (sector[i*32 + j] == filename[j]);
+                }
+                // Compare the extension
+                for (int j = 0; j < 3; j++) {
+                        matches &= (sector[i*32 + 0x8 + j] == extension[j]);
+                }
+                // If the match flag is still true, return the byte index
+                if (matches) {
+                        return i*32;
+                }
+        }
+        return -1;
+}
+
 void load_cluster(fat16_t* fs, uint16_t cluster_number, uint8_t* buf) {
         fat16_regions_t regions = calculate_regions(fs);
 
@@ -186,20 +214,20 @@ int32_t add_root_directory_entry(fat16_t* fs, fat16_dir_entry_t* entry) {
         fat16_regions_t regions = calculate_regions(fs);
 
         // Load the first cluster of the directory
-        disk_rd(regions.root_directory_region_start, current_sector, fs->bytes_per_sector);
-
         uint16_t current_sector_num = regions.root_directory_region_start;
+        disk_rd(current_sector_num, current_sector, fs->bytes_per_sector);
+
         int32_t first_space = find_first_free_space_in_root_directory_sector(fs, current_sector);
         while (first_space == -1) {
                 // Get the next sector in the directory and load it
                 current_sector_num++;
 
-                if (current_sector_num > regions.root_directory_region_size) {
+                if (current_sector_num > regions.root_directory_region_start + regions.root_directory_region_size) {
                         // There is no space left in the root directory
                         return -1;
                 }
 
-                load_cluster(fs, current_sector_num, current_sector);
+                disk_rd(current_sector_num, current_sector, fs->bytes_per_sector);
                 // Look for a free space in this cluster
                 first_space = find_first_free_space_in_root_directory_sector(fs, current_sector);
         }
@@ -280,8 +308,54 @@ int32_t add_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t
         return 0;
 }
 
+int32_t update_root_directory_entry(fat16_t* fs, fat16_dir_entry_t* updated_entry, char* old_filename, char* old_extension) {
+        uint8_t* current_sector = stdmem_allocate(fs->bytes_per_sector); // buffer to read the cluster into
+
+        fat16_regions_t regions = calculate_regions(fs);
+
+        // Load the first cluster of the directory
+        uint16_t current_sector_num = regions.root_directory_region_start;
+        disk_rd(current_sector_num, current_sector, fs->bytes_per_sector);
+
+        int32_t file_index = find_file_in_root_directory_sector(fs, current_sector, old_filename, old_extension);
+        while (file_index == -1) {
+                // Get the next sector in the directory and load it
+                current_sector_num++;
+
+                if (current_sector_num > regions.root_directory_region_start + regions.root_directory_region_size) {
+                        // There is no space left in the root directory
+                        return -1;
+                }
+
+                disk_rd(current_sector_num, current_sector, fs->bytes_per_sector);
+                // Look for a free space in this cluster
+                file_index = find_file_in_root_directory_sector(fs, current_sector, old_filename, old_extension);
+        }
+
+        current_sector[file_index] = updated_entry->filename[0];
+        for (int i = 1; i < 8; i++) {
+                current_sector[file_index + i] = updated_entry->filename[i];
+        }
+        for (int i = 0; i < 3; i++) {
+                current_sector[file_index + 0x08 + i] = updated_entry->extension[i];
+        }
+        current_sector[file_index + 0x0b] = updated_entry->attributes;
+
+        current_sector[file_index + 0x1a] = (updated_entry->first_cluster) & 0xFF;
+        current_sector[file_index + 0x1b] = ((updated_entry->first_cluster)>>8) & 0xFF;
+
+        current_sector[file_index + 0x1c] = (updated_entry->file_size_bytes) & 0xFF;
+        current_sector[file_index + 0x1d] = ((updated_entry->file_size_bytes)>>8) & 0xFF;
+        current_sector[file_index + 0x1e] = ((updated_entry->file_size_bytes)>>16) & 0xFF;
+        current_sector[file_index + 0x1f] = ((updated_entry->file_size_bytes)>>24) & 0xFF;
+
+        disk_wr(current_sector_num, current_sector, fs->bytes_per_sector);
+
+        return 0;
+}
+
 // TODO: combine with add_directory_entry?
-int32_t update_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* updated_entry) {
+int32_t update_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entry_t* updated_entry, char* old_filename, char* old_extension) {
         uint8_t* current_cluster = stdmem_allocate(fs->bytes_per_sector * fs->sectors_per_cluster); // buffer to read the cluster into
 
         // Load the first cluster of the directory
@@ -289,7 +363,7 @@ int32_t update_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entr
 
         uint16_t current_cluster_num = dir_cluster;
         uint16_t previous_cluster_num = 0;
-        int32_t file_index = find_file_in_directory_cluster(fs, current_cluster, &(updated_entry->filename[0]), &(updated_entry->extension[0]));
+        int32_t file_index = find_file_in_directory_cluster(fs, current_cluster, old_filename, old_extension);
         while (file_index == -1) {
                 // Get the next cluster in this directory and load it
                 previous_cluster_num = current_cluster_num;
@@ -301,10 +375,10 @@ int32_t update_directory_entry(fat16_t* fs, uint16_t dir_cluster, fat16_dir_entr
                 }
 
                 load_cluster(fs, current_cluster_num, current_cluster);
-                file_index = find_file_in_directory_cluster(fs, current_cluster, &(updated_entry->filename[0]), &(updated_entry->extension[0]));
+                file_index = find_file_in_directory_cluster(fs, current_cluster, old_filename, old_extension);
         }
 
-        current_cluster[file_index] = updated_entry->filename[0] == 0xe5 ? 0x05 : updated_entry->filename[0];
+        current_cluster[file_index] = updated_entry->filename[0];
         for (int i = 1; i < 8; i++) {
                 current_cluster[file_index + i] = updated_entry->filename[i];
         }
@@ -879,7 +953,7 @@ int32_t create_new_file(char* pathname, uint8_t attributes) {
 /**
  * -1 = failure, 0 = success
  */
-int32_t update_file_details(char* pathname, fat16_dir_entry_t* updated_entry) {
+int32_t update_file_details(char* pathname, fat16_dir_entry_t* updated_entry, char* old_filename, char* old_extension) {
         tailq_fat16_dir_head_t* root_dir = get_root_dir(fs);
         if (pathname[0] != '/') {
                 return -1;
@@ -888,15 +962,26 @@ int32_t update_file_details(char* pathname, fat16_dir_entry_t* updated_entry) {
 
         // If the directory doesn't exist, fail
         char* dir_path = to_directory(stripped_pathname);
-        fat16_dir_entry_t* dir = find_dir(dir_path, root_dir);
-        if (dir == NULL) {
+        fat16_dir_entry_t* file = find_file(stripped_pathname, root_dir);
+        if (file == NULL) {
                 return -1;
         }
 
-        char* filename = to_filename(stripped_pathname);
-        fat16_file_name_t file = split_filename(filename);
+        if (dir_path[0] == '\0') {
+                // In root folder
+                return update_root_directory_entry(fs, updated_entry, old_filename, old_extension);
+        } else {
+                // In another folder
+                fat16_dir_entry_t* dir = find_dir(dir_path, root_dir);
+                if (dir == NULL) {
+                        return -1;
+                }
 
-        return update_directory_entry(fs, dir->first_cluster, updated_entry);
+                //char* filename = to_filename(stripped_pathname);
+                //fat16_file_name_t file = split_filename(filename);
+
+                return update_directory_entry(fs, dir->first_cluster, updated_entry, old_filename, old_extension);
+        }
 }
 
 filedesc_t sys_open(char* pathname, int32_t flags) {
@@ -965,7 +1050,7 @@ int32_t sys_write(int fd, char *buf, size_t nbytes) {
                         // If we have increased the size of the file, update the file metadata and write it to disk
                         if (open_file->offset + num_bytes_written > open_file->directory_entry->file_size_bytes) {
                                 open_file->directory_entry->file_size_bytes = open_file->offset + num_bytes_written;
-                                update_file_details(open_file->path, open_file->directory_entry);
+                                update_file_details(open_file->path, open_file->directory_entry, &open_file->directory_entry->filename[0], &open_file->directory_entry->extension[0]);
                         }
 
                         open_file->offset += num_bytes_written;
@@ -1026,14 +1111,16 @@ int32_t sys_unlink(char* pathname) {
         }
 
         fat16_dir_entry_t* file = find_file(&pathname[1], get_root_dir(fs));
-
         if (file == NULL) {
                 return -1;
         }
 
-        file->filename[0] = 0xe5;
-        update_file_details(pathname, file);
+        char* old_filename = stdmem_allocate(9);
+        stdmem_copy(old_filename, &file->filename[0], 9);
 
+        file->filename[0] = 0xe5;
+
+        update_file_details(pathname, file, old_filename, &file->extension[0]);
         return 0;
 }
 

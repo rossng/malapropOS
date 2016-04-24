@@ -8,6 +8,10 @@
 #include "pwd.h"
 #include "cat.h"
 #include "mkdir.h"
+#include "touch.h"
+#include "write.h"
+#include "append.h"
+#include "rm.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -254,6 +258,18 @@ proc_ptr choose_process(char* name) {
         }
         if (stdstring_compare("mkdir", name) == 0) {
                 return entry_mkdir;
+        }
+        if (stdstring_compare("touch", name) == 0) {
+                return entry_touch;
+        }
+        if (stdstring_compare("write", name) == 0) {
+                return entry_write;
+        }
+        if (stdstring_compare("rm", name) == 0) {
+                return entry_rm;
+        }
+        if (stdstring_compare("append", name) == 0) {
+                return entry_append;
         }
         return NULL;
 }
