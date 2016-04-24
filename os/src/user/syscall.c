@@ -198,3 +198,29 @@ tailq_fat16_dir_head_t* _getdents(filedesc_t fd, int32_t max_num) {
                 : "r0", "r1");
         return r;
 }
+
+int32_t _chdir(char* path) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "svc #12    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (path)
+                : "r0", "r1");
+        return r;
+}
+
+
+char* _getcwd(char* buf, size_t nbytes) {
+        char* r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "svc #183   \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (buf), "r" (nbytes)
+                : "r0", "r1");
+        return r;
+}

@@ -154,6 +154,14 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         ctx->gpr[0] = result;
                         break;
                 }
+                case 12 : { // chdir
+                        char* path = (char*)(ctx->gpr[0]);
+
+                        int32_t result = sys_chdir(path);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
                 case 19 : { // lseek
                         filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
                         int32_t offset = (int32_t)(ctx->gpr[1]);
@@ -203,6 +211,15 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                 }
                 case 158 : { // yield
                         scheduler_run(ctx);
+                        break;
+                }
+                case 183 : { // getcwd
+                        char* buf = (char*)(ctx->gpr[0]);
+                        size_t nbytes = (size_t)(ctx->gpr[1]);
+
+                        char* result = sys_getcwd(buf, nbytes);
+
+                        ctx->gpr[0] = (int32_t)result;
                         break;
                 }
                 case 1000 : { // non-standard exec

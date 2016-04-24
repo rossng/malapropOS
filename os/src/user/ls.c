@@ -6,8 +6,21 @@
 #include <syscall.h>
 
 void ls(int32_t argc, char* argv[]) {
-        filedesc_t root = _open(argv[0], O_CREAT);
-        tailq_fat16_dir_head_t* files = _getdents(root, 100);
+        filedesc_t dir;
+        if (argc > 0) {
+                dir = _open(argv[0], 0);
+        } else {
+                char* cwd = stdmem_allocate(sizeof(char)*100);
+                _getcwd(cwd, 100);
+                dir = _open(cwd, 0);
+        }
+
+        if (dir < 0) {
+                stdio_print("Directory not found.\n");
+                stdproc_exit(-1);
+        }
+
+        tailq_fat16_dir_head_t* files = _getdents(dir, 100);
 
         tailq_fat16_dir_entry_t* directory_entry;
         TAILQ_FOREACH(directory_entry, files, entries) {

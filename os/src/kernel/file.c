@@ -1032,6 +1032,36 @@ tailq_fat16_dir_head_t* sys_getdents(filedesc_t fd, int32_t max_num) {
         return get_dir(fs, open_directory->directory_entry);
 }
 
+char* current_working_dir;
+int32_t sys_chdir(char* path) {
+        int32_t len = stdstring_length(path);
+        if (stdstring_compare("/", path) == 0) {
+                current_working_dir[0] = '/';
+                current_working_dir[1] = '\0';
+                return 0;
+        } else if (path[0] == '/'&& find_dir(path, get_root_dir(fs)) != NULL) {
+                stdmem_copy(current_working_dir, path, len + 1);
+                return 0;
+        } else if (find_dir(path, get_dir(fs, find_dir(current_working_dir, get_root_dir(fs))))) {
+                // TODO: not currently working
+                size_t start = stdstring_length(current_working_dir);
+                if (start < 100) {
+                        current_working_dir[start] = '/';
+                }
+                stdmem_copy(&current_working_dir[start+1], path, 100-(start+1));
+                return 0;
+        } else {
+                return -1;
+        }
+}
+
+char* sys_getcwd(char* buf, size_t nbytes) {
+        size_t cwd_len = stdstring_length(current_working_dir);
+        size_t len = cwd_len > nbytes ? nbytes : cwd_len;
+        stdmem_copy(buf, current_working_dir, len);
+        return buf;
+}
+
 /**
  * Initialise the various streams and the filesystem.
  */
@@ -1041,4 +1071,6 @@ void file_initialise() {
         stderr_buffer = stdstream_initialise_buffer();
         fs = inspect_file_system();
         TAILQ_INIT(open_files);
+        current_working_dir = stdmem_allocate(sizeof(char)*100);
+        sys_chdir("/");
 }

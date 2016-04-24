@@ -13,6 +13,8 @@ struct tailq_stream_head* stdin_buffer;
 struct tailq_stream_head* stdout_buffer;
 struct tailq_stream_head* stderr_buffer;
 
+char* current_working_dir;
+
 typedef struct fat16_s {
         uint16_t bytes_per_sector;
         uint8_t sectors_per_cluster;
@@ -48,6 +50,8 @@ int32_t sys_close(filedesc_t fd);
 int32_t sys_unlink(char* pathname);
 int32_t sys_lseek(filedesc_t fd, int32_t offset, int32_t whence);
 tailq_fat16_dir_head_t* sys_getdents(filedesc_t fd, int32_t max_num);
+int32_t sys_chdir(char* path);
+char* sys_getcwd(char* buf, size_t nbytes);
 
 void file_initialise();
 

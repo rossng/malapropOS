@@ -16,4 +16,12 @@ typedef struct {
         int32_t cursor_position;
 } shell_line_t;
 
+typedef struct {
+        char* name;
+        int32_t argc;
+        int32_t priority;
+        bool background;
+        char** argv;
+} shell_command_t;
+
 #endif

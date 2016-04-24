@@ -20,8 +20,6 @@ int32_t stdstring_compare(char* str1, char* str2);
 void stdstring_int_to_str(int32_t n, char* str);
 void stdstring_reverse(char* str);
 
-
-
 typedef struct {
         char* token_start;
         char* after_token;

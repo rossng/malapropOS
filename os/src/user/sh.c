@@ -4,6 +4,8 @@
 #include "P0.h"
 #include "P1.h"
 #include "ls.h"
+#include "cd.h"
+#include "pwd.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -194,6 +196,60 @@ void get_line(char* buf, size_t nbytes) {
         buf[nbytes-1] = '\0';
 }
 
+shell_command_t* parse_shell_command(char* line) {
+        shell_command_t* result = stdmem_allocate(sizeof(shell_command_t));
+        result->argc = 0;
+        result->argv = stdmem_allocate(sizeof(char*)*10); // space for 10 arguments (TODO: allow infinite)
+        result->background = 0;
+        result->priority = 1;
+
+        token_t* token = stdstring_next_token(line, " ");
+
+        char* name = stdmem_allocate(sizeof(char)*(stdstring_length(token->token_start) + 1));
+        stdmem_copy(name, token->token_start, stdstring_length(token->token_start) + 1);
+
+        result->name = name;
+
+        while (token->after_token != NULL && result->argc < 10) {
+                token = stdstring_next_token(token->after_token, " ");
+                int32_t token_length = stdstring_length(token->token_start);
+                if (stdstring_compare(token->token_start, "&") == 0) {
+                        result->background = 1;
+                        break;
+                }
+                if (stdstring_compare(token->token_start, "!") == 0) {
+                        result->priority = 0;
+                        break;
+                }
+                if (token_length > 0) {
+                        result->argv[result->argc] = stdmem_allocate(sizeof(char)*(token_length + 1));
+                        stdmem_copy(result->argv[result->argc], token->token_start, token_length + 1);
+                        result->argc++;
+                }
+        }
+
+        return result;
+}
+
+proc_ptr choose_process(char* name) {
+        if (stdstring_compare("P0", name) == 0) {
+                return entry_P0;
+        }
+        if (stdstring_compare("P1", name) == 0) {
+                return entry_P1;
+        }
+        if (stdstring_compare("ls", name) == 0) {
+                return entry_ls;
+        }
+        if (stdstring_compare("cd", name) == 0) {
+                return entry_cd;
+        }
+        if (stdstring_compare("pwd", name) == 0) {
+                return entry_pwd;
+        }
+        return NULL;
+}
+
 void mush() {
         sh_stdin_buffer = stdstream_initialise_buffer();
         char* last_line = stdmem_allocate(101);
@@ -201,55 +257,16 @@ void mush() {
         while (1) {
                 get_line(last_line, 101);
                 // TODO: make this sane
-                token_t* token = stdstring_next_token(last_line, " ");
-                if (stdstring_compare(token->token_start, "exit") == 0) {
-                        _exit(EXIT_SUCCESS);
-                } else if (stdstring_compare(token->token_start, "P0") == 0) {
-                        if (token->after_token != NULL) {
-                                token = stdstring_next_token(token->after_token, " ");
-                                if (stdstring_compare(token->token_start, "&") == 0) { // Background, low priority
-                                        launch_process_bg(entry_P0, 0, NULL);
-                                } else if (stdstring_compare(token->token_start, "!") == 0) { // Foreground, high priority
-                                        launch_process(entry_P0, 0, NULL, 0);
-                                } else {
-                                        stdio_print("Invalid launch options\n");
-                                }
-                        } else { // Foreground, low priority
-                                launch_process(entry_P0, 0, NULL, 1);
-                        }
-                } else if (stdstring_compare(token->token_start, "P1") == 0) {
-                        if (token->after_token != NULL) {
-                                token = stdstring_next_token(token->after_token, " ");
-                                if (stdstring_compare(token->token_start, "&") == 0) {
-                                        launch_process_bg(entry_P1, 0, NULL);
-                                } else if (stdstring_compare(token->token_start, "!") == 0) {
-                                        launch_process(entry_P1, 0, NULL, 0);
-                                } else {
-                                        stdio_print("Invalid launch options\n");
-                                }
-                        } else {
-                                launch_process(entry_P1, 0, NULL, 1);
-                        }
-                } else if (stdstring_compare(token->token_start, "ls") == 0) {
-                        char* argv[1];
-                        argv[0] = "/";
-                        if (token->after_token != NULL) {
-                                token = stdstring_next_token(token->after_token, " ");
-                                if (stdstring_compare(token->token_start, "&") == 0) {
-                                        launch_process_bg(entry_ls, 1, argv);
-                                } else if (stdstring_compare(token->token_start, "!") == 0) {
-                                        launch_process(entry_ls, 1, argv, 0);
-                                } else {
-                                        stdio_print("Invalid launch options\n");
-                                }
-                        } else {
-                                launch_process(entry_ls, 1, argv, 1);
-                        }
-                } else if (stdstring_length(token->token_start) == 0) {
-                        continue;
+                shell_command_t* command = parse_shell_command(last_line);
+                proc_ptr function = choose_process(command->name);
+
+                if (function == NULL) {
+                        stdio_print("Command not recognised.");
+                } else if (command->background) {
+                        launch_process_bg(function, command->argc, command->argv);
                 } else {
-                        stdio_print("Command not recognised\n");
-                };
+                        launch_process(function, command->argc, command->argv, command->priority);
+                }
         }
 }
 

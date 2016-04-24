@@ -6,16 +6,20 @@
 #include <syscall.h>
 
 void cd(int32_t argc, char* argv[]) {
-        filedesc_t root = _open("/", O_CREAT);
-        tailq_fat16_dir_head_t* files = _getdents(root, 100);
+        filedesc_t dir;
+        if (argc > 0) {
+                dir = _open(argv[0], 0);
 
-        tailq_fat16_dir_entry_t* directory_entry;
-        TAILQ_FOREACH(directory_entry, files, entries) {
-                stdio_print(&(directory_entry->entry.filename[0]));
-                stdio_print("\n");
+                if (dir < 0) {
+                        stdio_print("Directory not found.\n");
+                        stdproc_exit(-1);
+                }
+
+                _chdir(argv[0]);
+                stdproc_exit(EXIT_SUCCESS);
         }
 
-        stdproc_exit(EXIT_SUCCESS);
+        stdproc_exit(-1);
 }
 
 proc_ptr entry_cd = &cd;
