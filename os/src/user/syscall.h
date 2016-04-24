@@ -19,6 +19,9 @@ int32_t _read(int32_t fd, char* buf, size_t nbytes);
 size_t _write(int32_t fd, char* buf, size_t nbytes);
 
 filedesc_t _open(char* pathname, int32_t flags);
+int32_t _close(filedesc_t fd);
+int32_t _unlink(char* pathname);
+int32_t _lseek(filedesc_t fd, int32_t offset, int32_t whence);
 
 void* _sbrk(int32_t incr);
 

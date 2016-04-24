@@ -145,8 +145,6 @@ int32_t _setpriority(pid_t which, pid_t who, int32_t priority) {
         return r;
 }
 
-
-
 filedesc_t _open(char* pathname, int32_t flags) {
         filedesc_t r;
         asm volatile(
@@ -157,5 +155,29 @@ filedesc_t _open(char* pathname, int32_t flags) {
                 : "=r" (r)
                 : "r" (pathname), "r" (flags)
                 : "r0", "r1");
+        return r;
+}
+
+int32_t _close(filedesc_t fd) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "svc #6     \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (fd)
+                : "r0");
+        return r;
+}
+
+int32_t _unlink(char* pathname) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "svc #10    \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (pathname)
+                : "r0");
         return r;
 }

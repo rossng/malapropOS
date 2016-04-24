@@ -891,14 +891,16 @@ int32_t sys_write(int fd, char *buf, size_t nbytes) {
                         return -1;
                 } else {
                         // If the append flag is set, start writing at the end of the file. Else start writing at the current offset.
-                        uint32_t offset = open_file->append ? open_file->directory_entry->file_size_bytes : open_file->offset;
-                        int32_t num_bytes_written = write_to_file(fs, open_file->directory_entry, offset, buf, nbytes);
+                        if (open_file->append) {
+                                open_file->offset = open_file->directory_entry->file_size_bytes;
+                        }
+                        int32_t num_bytes_written = write_to_file(fs, open_file->directory_entry, open_file->offset, buf, nbytes);
                         if (num_bytes_written < 0) {
                                 return -1;
                         }
                         // If we have increased the size of the file, update the file metadata and write it to disk
-                        if (offset + num_bytes_written > open_file->directory_entry->file_size_bytes) {
-                                open_file->directory_entry->file_size_bytes = offset + num_bytes_written;
+                        if (open_file->offset + num_bytes_written > open_file->directory_entry->file_size_bytes) {
+                                open_file->directory_entry->file_size_bytes = open_file->offset + num_bytes_written;
                                 update_file_details(open_file->path, open_file->directory_entry);
                         }
 
@@ -932,6 +934,68 @@ int32_t sys_read(filedesc_t fd, char *buf, size_t nbytes) {
         }
 }
 
+int32_t sys_close(filedesc_t fd) {
+        tailq_open_file_t* file = find_open_file_by_fd(fd);
+        if (file == NULL) {
+                return -1;
+        } else {
+                TAILQ_REMOVE(open_files, file, entries);
+                return 0;
+        }
+}
+
+// TODO: meaningful errors
+int32_t sys_unlink(char* pathname) {
+        tailq_open_file_t* open_file = find_open_file(pathname);
+        if (open_file != NULL) {
+                // Cannot delete an open file
+                return -1;
+        }
+
+        if (pathname[0] != '/') {
+                return -1;
+        }
+
+        fat16_dir_entry_t* file = find_file(&pathname[1], get_root_dir(fs));
+
+        if (file == NULL) {
+                return -1;
+        }
+
+        file->filename[0] = 0xe5;
+        update_file_details(pathname, file);
+
+        return 0;
+}
+
+int32_t sys_lseek(filedesc_t fd, int32_t offset, int32_t whence) {
+        tailq_open_file_t* file = find_open_file_by_fd(fd);
+        if (file == NULL) {
+                return -1;
+        } else {
+                switch (whence) {
+                        case SEEK_SET : {
+                                file->offset = offset;
+                                return 0;
+                        }
+                        case SEEK_CUR : {
+                                file->offset += offset;
+                                return 0;
+                        }
+                        case SEEK_END : {
+                                file->offset = file->directory_entry->file_size_bytes + offset;
+                                return 0;
+                        }
+                        default : {
+                                return -1;
+                        }
+                }
+        }
+}
+
+/**
+ * Initialise the various streams and the filesystem.
+ */
 void file_initialise() {
         stdin_buffer = stdstream_initialise_buffer();
         stdout_buffer = stdstream_initialise_buffer();

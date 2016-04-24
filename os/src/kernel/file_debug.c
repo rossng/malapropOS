@@ -1,6 +1,6 @@
 #include "file.h"
 
-char debug_result[200];
+char debug_result[400];
 
 char* path = "/MYFILE1.TXT";
 char* path2 = "/ANOTHER.DOC";
@@ -16,15 +16,16 @@ char* debug_file_list() {
         char* tmp = stdmem_allocate(sizeof(char)*15);
         TAILQ_FOREACH(item, open_files, entries) {
                 stdstring_int_to_str(item->fd, tmp);
-                result_index = stdstring_append(debug_result, result_index, "{");
+                result_index = stdstring_append(debug_result, result_index, "{ fd: ");
                 result_index = stdstring_append(debug_result, result_index, tmp);
-                result_index = stdstring_append(debug_result, result_index, ", ");
+                result_index = stdstring_append(debug_result, result_index, ", ofst: ");
                 stdstring_int_to_str(item->offset, tmp);
                 result_index = stdstring_append(debug_result, result_index, tmp);
-                result_index = stdstring_append(debug_result, result_index, ", ");
-
+                result_index = stdstring_append(debug_result, result_index, ", size: ");
+                stdstring_int_to_str(item->directory_entry->file_size_bytes, tmp);
+                result_index = stdstring_append(debug_result, result_index, tmp);
+                result_index = stdstring_append(debug_result, result_index, ", pth: ");
                 result_index = stdstring_append(debug_result, result_index, item->path);
-
                 result_index = stdstring_append(debug_result, result_index, "} ");
         }
 

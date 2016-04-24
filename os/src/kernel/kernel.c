@@ -100,9 +100,9 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         break;
                 }
                 case 4 : { // write
-                        int fd = (int)(ctx->gpr[0]);
+                        filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
                         char* ptr = (char*)(ctx->gpr[1]);
-                        int len = (int)(ctx->gpr[2]);
+                        int32_t len = (int32_t)(ctx->gpr[2]);
 
                         int32_t result = sys_write(fd, ptr, len);
 
@@ -114,6 +114,14 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         int32_t flags = (int32_t)(ctx->gpr[1]);
 
                         filedesc_t result = sys_open(pathname, flags);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 6 : { // close
+                        filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
+
+                        int32_t result = sys_close(fd);
 
                         ctx->gpr[0] = result;
                         break;
@@ -131,6 +139,24 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         } else {
                                 result = scheduler_block_process(ctx, until_event);
                         }
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 10 : { // unlink
+                        char* pathname = (char*)(ctx->gpr[0]);
+
+                        int32_t result = sys_unlink(pathname);
+
+                        ctx->gpr[0] = result;
+                        break;
+                }
+                case 19 : { // lseek
+                        filedesc_t fd = (filedesc_t)(ctx->gpr[0]);
+                        int32_t offset = (int32_t)(ctx->gpr[1]);
+                        int32_t whence = (int32_t)(ctx->gpr[2]);
+
+                        int32_t result = sys_lseek(fd, offset, whence);
 
                         ctx->gpr[0] = result;
                         break;

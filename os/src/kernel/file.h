@@ -96,8 +96,12 @@ tailq_open_files_head_t* open_files;
 
 int32_t sys_write(filedesc_t fd, char *ptr, size_t len);
 int32_t sys_read(filedesc_t fd, char *ptr, size_t len);
-void file_initialise();
 
 filedesc_t sys_open(char* pathname, int32_t flags);
+int32_t sys_close(filedesc_t fd);
+int32_t sys_unlink(char* pathname);
+int32_t sys_lseek(filedesc_t fd, int32_t offset, int32_t whence);
+
+void file_initialise();
 
 #endif

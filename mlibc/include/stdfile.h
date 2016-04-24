@@ -8,4 +8,8 @@
 #define O_WRONLY 2
 #define O_RDWR 3
 
+#define SEEK_SET 1
+#define SEEK_CUR 2
+#define SEEK_END 3
+
 #endif
