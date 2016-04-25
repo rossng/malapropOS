@@ -252,6 +252,10 @@ int32_t scheduler_kill(ctx_t* ctx, pid_t pid) {
         // And ask the scheduler to run something else
         scheduler_run(ctx);
 
+        // Mark the process as terminated
+        pcb_t* exited_process = find_process(pid);
+        exited_process->status = PROCESS_STATUS_TERMINATED;
+
         // Notify the world
         scheduler_emit_event((event_t){PROCESS_EVENT_EXITED, pid});
 

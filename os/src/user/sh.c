@@ -19,6 +19,7 @@
 #include "syscall.h"
 #include "writemany.h"
 #include "proc.h"
+#include "kill.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
 
@@ -187,7 +188,7 @@ void get_line(char* buf, size_t nbytes) {
                 if (c == 3) {                           // Ctrl+C
                         buf[0] = '\0';
                         return;
-                } else if (c == 'b' || c == 0x7f) {     // Backspace
+                } else if (c == 0x7f) {                 // Backspace 
                         // Backspace has some weird legacy mapping: http://www.ibb.net/%7Eanne/keyboard/keyboard.html
                         line_backspace(&line);
                 } else if (c == 27) {                   // Start of a control sequence
@@ -292,6 +293,9 @@ proc_ptr choose_process(char* name) {
         if (stdstring_compare("proc", name) == 0) {
                 return entry_proc;
         }
+        if (stdstring_compare("kill", name) == 0) {
+                return entry_kill;
+        }
         return NULL;
 }
 
@@ -306,7 +310,7 @@ void mush() {
                 proc_ptr function = choose_process(command->name);
 
                 if (function == NULL) {
-                        stdio_print("Command not recognised.");
+                        stdio_print("Command not recognised.\n");
                 } else if (command->background) {
                         launch_process_bg(function, command->argc, command->argv);
                 } else {
