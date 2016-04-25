@@ -10,19 +10,14 @@ MalapropOS has a custom libc called `mlibc`.
 
 * Communication over UART
 * Basic interrupt handling
-* Pre-emptive multi-tasking with a fixed process list and fixed timeslices
+* Pre-emptive multi-tasking
 * Dynamic creation and destruction of process with `fork()` and `exit()`
-* A very basic interactive shell, `mμsh`
+* An interactive shell, `mμsh`
 * Buffered input, support for `Ctrl+C` in the shell
-* A priority-based scheduling algorithm
+* A scheduler with 'high' and 'low' priority processes
 * Basic FAT16 support
-* Basic shell utilities: `cd`, `ls`, `cat`, `mkdir`, `pwd`
+* Basic shell utilities: `cd`, `ls`, `cat`, `mkdir`, `pwd`, `rm`, `touch`, `write`
 * Asynchronous message-passing IPC
-
-### In progress
-
-
-### Planned
 
 
 ## Supported platforms
@@ -155,3 +150,5 @@ Standard type definitions are from http://minirighi.sourceforge.net/html/types_8
 The `strtol()` implementation in `mlibc` is from Apple XNU.
 
 `stdstring_int_to_str` is based on the K&R implementation, listed at https://en.wikibooks.org/wiki/C_Programming/C_Reference/stdlib.h/itoa
+
+The `stddef.h` errno definitions are from Red Hat, http://www-numi.fnal.gov/offline_software/srt_public_context/WebDocs/Errors/unix_system_errors.html
