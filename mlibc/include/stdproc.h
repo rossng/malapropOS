@@ -2,6 +2,7 @@
 #define STDPROC_H_
 
 #include <stdtypes.h>
+#include <datastructures/stdqueue.h>
 
 // Exit statuses
 #define EXIT_SUCCESS 0
@@ -28,6 +29,47 @@
 #define SIGKILL 9
 #define SIGALRM 14
 #define SIGTERM 15
+
+
+
+typedef struct {
+        uint32_t cpsr, pc, gpr[13], sp, lr;
+} ctx_t;
+
+typedef struct {
+        procevent_t event;
+        pid_t from_process;
+} event_t;
+
+typedef struct {
+        pid_t pid;
+        ctx_t ctx;
+        procstatus_t status;
+        event_t blocked_until;
+} pcb_t;
+
+typedef struct tailq_pcb_s {
+        pcb_t pcb;
+        TAILQ_ENTRY(tailq_pcb_s) entries;
+} tailq_pcb_t;
+
+typedef struct tailq_pid_s {
+        pid_t pid;
+        TAILQ_ENTRY(tailq_pid_s) entries;
+} tailq_pid_t;
+
+typedef struct tailq_pidh_s {
+        pid_t pid;
+        TAILQ_ENTRY(tailq_pidh_s) entries;
+} tailq_pidh_t;
+
+typedef struct tailq_event_s {
+        event_t event;
+        TAILQ_ENTRY(tailq_event_s) entries;
+} tailq_event_t;
+
+TAILQ_HEAD(tailq_pcb_head_s, tailq_pcb_s);
+typedef struct tailq_pcb_head_s tailq_pcb_head_t;
 
 void stdproc_exit(procres_t result);
 pid_t stdproc_fork(void);

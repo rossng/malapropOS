@@ -319,3 +319,14 @@ int32_t _rmessage(char* buf, size_t nbytes, pid_t to) {
                 : "r0", "r1", "r2");
         return r;
 }
+
+tailq_pcb_head_t* _lprocs() {
+        tailq_pcb_head_t* r;
+        asm volatile(
+                "svc #1004  \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                :
+                : "r0");
+        return r;
+}

@@ -288,6 +288,11 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         ctx->gpr[0] = result;
                         break;
                 }
+                case 1004 : { // lprocs
+                        tailq_pcb_head_t* result = scheduler_list_procs();
+                        ctx->gpr[0] = (uint32_t)result;
+                        break;
+                }
                 default : { // unknown
                         break;
                 }

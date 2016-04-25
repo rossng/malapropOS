@@ -16,6 +16,7 @@ pid_t _waitpid(procevent_t event, pid_t pid, int32_t options);
 void _exec(proc_ptr function, int32_t argc, char* argv[]);
 int32_t _kill(pid_t pid, int32_t sig);
 int32_t _setpriority(pid_t which, pid_t who, int32_t priority);
+tailq_pcb_head_t* _lprocs();
 
 int32_t _read(int32_t fd, char* buf, size_t nbytes);
 size_t _write(int32_t fd, char* buf, size_t nbytes);

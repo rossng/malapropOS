@@ -18,6 +18,7 @@
 #include "consumer.h"
 #include "syscall.h"
 #include "writemany.h"
+#include "proc.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
 
@@ -287,6 +288,9 @@ proc_ptr choose_process(char* name) {
         }
         if (stdstring_compare("writemany", name) == 0) {
                 return entry_writemany;
+        }
+        if (stdstring_compare("proc", name) == 0) {
+                return entry_proc;
         }
         return NULL;
 }

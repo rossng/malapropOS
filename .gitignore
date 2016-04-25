@@ -4,6 +4,7 @@
 *.gch
 *.a
 disk.bin
+os/image.bin
 *.elf
 *.out
 *.i

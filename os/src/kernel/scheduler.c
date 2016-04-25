@@ -11,14 +11,17 @@ pid_t current_pid = NULL;
 pid_t next_pid = 1;
 void* current_stack_break = &stack_top_usr;
 
-TAILQ_HEAD(tailq_pcb_head_t, tailq_pcb_s);
-TAILQ_HEAD(tailq_pid_head_t, tailq_pid_s);
-TAILQ_HEAD(tailq_pidh_head_t, tailq_pidh_s);
-TAILQ_HEAD(tailq_event_head_t, tailq_event_s) events_head;
+TAILQ_HEAD(tailq_pid_head_s, tailq_pid_s);
+TAILQ_HEAD(tailq_pidh_head_s, tailq_pidh_s);
+TAILQ_HEAD(tailq_event_head_s, tailq_event_s);
+typedef struct tailq_pid_head_s tailq_pid_head_t;
+typedef struct tailq_pidh_head_s tailq_pidh_head_t;
+typedef struct tailq_event_head_s tailq_event_head_t;
 
-struct tailq_pcb_head_t process_list;
-struct tailq_pid_head_t low_priority_queue_head;
-struct tailq_pidh_head_t high_priority_queue_head;
+tailq_event_head_t events_head;
+tailq_pcb_head_t process_list;
+tailq_pid_head_t low_priority_queue_head;
+tailq_pidh_head_t high_priority_queue_head;
 
 /**
  * Like sbrk but for the stack.
@@ -369,6 +372,19 @@ pid_t scheduler_exec(ctx_t* ctx, proc_ptr function, int32_t argc, char* argv[]) 
         current_process->status = PROCESS_STATUS_RUNNING;
 
         return current_pid;
+}
+
+tailq_pcb_head_t* scheduler_list_procs() {
+        tailq_pcb_head_t* result = stdmem_allocate(sizeof(tailq_pcb_head_t));
+        TAILQ_INIT(result);
+        tailq_pcb_t* item;
+        TAILQ_FOREACH(item, &process_list, entries) {
+                tailq_pcb_t* copied_item = stdmem_allocate(sizeof(tailq_pcb_t));
+                copy_pcb(&copied_item->pcb, &item->pcb);
+                TAILQ_INSERT_TAIL(result, copied_item, entries);
+        }
+
+        return result;
 }
 
 /**
