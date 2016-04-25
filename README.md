@@ -120,10 +120,10 @@ The string "12345678912345678912345678912345678912345678912345678912345678912345
 
 Example: `writemany /MYFILE1.TXT 15` will write the string 15 times. If `MYFILE1.TXT` currently only occupies one cluster, it will be expanded to fit the text.
 
-### TODO: `proc`
+### `proc`
 Display the list of non-terminated processes.
 
-### TODO: `kill`
+### `kill`
 Terminate the process with the specified PID.
 
 Example: `kill 10`
