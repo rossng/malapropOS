@@ -13,6 +13,9 @@
 #include "append.h"
 #include "rm.h"
 #include "messenger.h"
+#include "producer.h"
+#include "pipeline.h"
+#include "consumer.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -271,6 +274,15 @@ proc_ptr choose_process(char* name) {
         }
         if (stdstring_compare("messenger", name) == 0) {
                 return entry_messenger;
+        }
+        if (stdstring_compare("producer", name) == 0) {
+                return entry_producer;
+        }
+        if (stdstring_compare("pipeline", name) == 0) {
+                return entry_pipeline;
+        }
+        if (stdstring_compare("consumer", name) == 0) {
+                return entry_consumer;
         }
         return NULL;
 }

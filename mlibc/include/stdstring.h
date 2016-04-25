@@ -31,4 +31,6 @@ token_t* stdstring_next_token(char* str, const char* delimeters);
 
 int32_t stdstring_append(char* dest, int32_t dest_index, char* source);
 
+long stdstring_strtol(const char *nptr, char **endptr, int base);
+
 #endif

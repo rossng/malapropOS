@@ -79,8 +79,6 @@ While a foreground process is executing, you can terminate it by pressing `Ctrl+
 
 To see high-priority mode in action, try running `P0 !` and pressing `Ctrl+C`. Because the shell is low-priority, execution of `P0` will not be terminated and will complete normally.
 
-To see IPC in action, run `messenger`. This program forks itself, then the parent sends a message to the queue and the child receives it.
-
 ### `P0` and `P1`
 Print out a series of ascending numbers and then exits. For an example of concurrent process execution, run `P0 &` followed by `P1 &` too see their interleaved output.
 
@@ -120,6 +118,32 @@ Remove the specified file. At the moment, only absolute paths are accepted.
 
 Example: `rm /MYFILE1.TXT`
 
+## IPC
+
+MalapropOS implements asynchronous message passing. A simple demonstration can be seen by running `messenger`. This program forks itself, then the parent sends a message to the queue and the child receives it.
+
+A more complicated demonstration is the 'pipeline'. This consists of three components: a `consumer`, which consumes single-character messages and prints them; a `pipeline`, which consumes single-character messages and sends them on, with the character increments; and a `producer`, which sends single-character messages. These can be attached as so:
+
+```
+producer -> pipeline -> ... -> pipeline -> consumer
+```
+
+For example:
+
+```
+mush> consumer &        // create the consumer in the background
+Consumer PID: 2
+mush> pipeline 2 &      // attach the first pipeline to the consumer
+Pipeline PID: 3
+mush> pipeline 3 &      // attach the second pipeline to the consumer
+Pipeline PID: 4
+mush> producer 4 A      // attach the producer to the second pipeline
+Consumer: received C    // output from the consumer
+Consumer: received C
+```
+
+Here the producer generates the message 'A' repeatedly, and it arrives at the consumer as 'C'.
+
 ## Acknowledgements
 
 The implementation of TAILQ is from FreeBSD.
@@ -127,3 +151,7 @@ The implementation of TAILQ is from FreeBSD.
 The implementation of `stdarg.h` is from GCC.
 
 Standard type definitions are from http://minirighi.sourceforge.net/html/types_8h-source.html
+
+The `strtol()` implementation in `mlibc` is from Apple XNU.
+
+`stdstring_int_to_str` is based on the K&R implementation, listed at https://en.wikibooks.org/wiki/C_Programming/C_Reference/stdlib.h/itoa

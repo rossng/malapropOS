@@ -262,8 +262,9 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         pid_t from = (pid_t)(ctx->gpr[2]);
                         pid_t to = (pid_t)(ctx->gpr[3]);
 
-                        ipc_send_message(buf, nbytes, from, to);
+                        int32_t result = ipc_send_message(buf, nbytes, from, to);
 
+                        ctx->gpr[0] = result;
                         break;
                 }
                 case 1002 : { // rmessagefr
@@ -272,8 +273,9 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         pid_t from = (pid_t)(ctx->gpr[2]);
                         pid_t to = (pid_t)(ctx->gpr[3]);
 
-                        ipc_receive_message_from(buf, nbytes, from, to);
+                        int32_t result = ipc_receive_message_from(buf, nbytes, from, to);
 
+                        ctx->gpr[0] = result;
                         break;
                 }
                 case 1003 : { // rmessage
@@ -281,8 +283,9 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         size_t nbytes = (size_t)(ctx->gpr[1]);
                         pid_t to = (pid_t)(ctx->gpr[2]);
 
-                        ipc_receive_any_message(buf, nbytes, to);
+                        int32_t result = ipc_receive_any_message(buf, nbytes, to);
 
+                        ctx->gpr[0] = result;
                         break;
                 }
                 default : { // unknown
