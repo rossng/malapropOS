@@ -17,6 +17,7 @@ MLIBC_INCLUDES   = ./include
 	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${MLIBC_INCLUDES}) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -nostdinc -g -c -O -o ${@} ${<}
 
 libc.a : ${MLIBC_OBJECTS}
+	@mkdir -p build
 	@${LINARO_PATH}/bin/${LINARO_PREFIX}-ar rcs build/libc.a ${^}
 
 %.i : %.c
