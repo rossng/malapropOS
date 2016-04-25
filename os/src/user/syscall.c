@@ -275,3 +275,47 @@ int32_t _mkdir(char* path) {
                 : "r0", "r1");
         return r;
 }
+
+
+int32_t _smessage(char* buf, size_t nbytes, pid_t from, pid_t to) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "mov r3, %4 \n"
+                "svc #1001  \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (buf), "r" (nbytes), "r" (from), "r" (to)
+                : "r0", "r1", "r2", "r3");
+        return r;
+}
+
+int32_t _rmessagefr(char* buf, size_t nbytes, pid_t from, pid_t to) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "mov r3, %4 \n"
+                "svc #1002  \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (buf), "r" (nbytes), "r" (from), "r" (to)
+                : "r0", "r1", "r2", "r3");
+        return r;
+}
+int32_t _rmessage(char* buf, size_t nbytes, pid_t to) {
+        int32_t r;
+        asm volatile(
+                "mov r0, %1 \n"
+                "mov r1, %2 \n"
+                "mov r2, %3 \n"
+                "svc #1003  \n"
+                "mov %0, r0 \n"
+                : "=r" (r)
+                : "r" (buf), "r" (nbytes), "r" (to)
+                : "r0", "r1", "r2");
+        return r;
+}

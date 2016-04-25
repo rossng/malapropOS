@@ -318,11 +318,19 @@ pid_t scheduler_fork(ctx_t* ctx, uint32_t sp, uint32_t fp) {
                 new_process->pcb.ctx.sp = ((uint32_t) new_break) - (fp - sp); // New stack pointer
                 stdmem_copy((void*)new_process->pcb.ctx.sp, (void*)sp, fp - sp); // Copy the frame
 
-                /*// Now add another frame to simulate returning from the syscall - this is pretty fragile
-                uint32_t previous_fp = new_process->pcb.ctx.gpr[11];
-                new_process->pcb.ctx.gpr[11] = new_process->pcb.ctx.sp;
-                new_process->pcb.ctx.sp -= 4;
-                *((uint32_t*)new_process->pcb.ctx.sp) = previous_fp; // Store the saved fp into the new frame*/
+                // The stored fp for the previous frame now needs to be replaced with the new break,
+                // otherwise we will simply jump back into the original frame location when returning
+                uint32_t* saved_fp = (uint32_t*)(new_process->pcb.ctx.gpr[11] - 12);
+                *saved_fp = ((uint32_t)new_break);
+
+                saved_fp = (uint32_t*)(new_process->pcb.ctx.gpr[11] - 16);
+                *saved_fp = ((uint32_t)new_break);
+
+                saved_fp = (uint32_t*)(new_process->pcb.ctx.gpr[11] - 0);
+                *saved_fp = ((uint32_t)new_break);
+
+                saved_fp = (uint32_t*)(new_process->pcb.ctx.gpr[11] + 24);
+                *saved_fp = ((uint32_t)new_break);
 
                 TAILQ_INSERT_TAIL(&process_list, new_process, entries);
 

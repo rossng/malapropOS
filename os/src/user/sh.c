@@ -12,6 +12,7 @@
 #include "write.h"
 #include "append.h"
 #include "rm.h"
+#include "messenger.h"
 #include "syscall.h"
 #include "../device/PL011.h"
 #include <stdstream.h>
@@ -76,11 +77,7 @@ void launch_process(proc_ptr function, int32_t argc, char* argv[], int32_t prior
         }
 }
 
-void (*bg_process)();
 void launch_process_bg(proc_ptr function, int32_t argc, char* argv[]) {
-        // Both copying the stack and COW are too complicated, just store the argument in a global
-        // so it's preserved on both sides of the fork. Obviously going to be some nasty race conditions here.
-        bg_process = function;
         uint32_t fp;
         asm volatile(
                 "mov %0, r11 \n"
@@ -90,8 +87,9 @@ void launch_process_bg(proc_ptr function, int32_t argc, char* argv[]) {
         );
         int32_t fork_pid = _fork(fp);
         if (fork_pid == 0) {
-                _exec(bg_process, argc, argv);
+                _exec(function, argc, argv);
         } else {
+                _yield();
         }
 }
 
@@ -270,6 +268,9 @@ proc_ptr choose_process(char* name) {
         }
         if (stdstring_compare("append", name) == 0) {
                 return entry_append;
+        }
+        if (stdstring_compare("messenger", name) == 0) {
+                return entry_messenger;
         }
         return NULL;
 }

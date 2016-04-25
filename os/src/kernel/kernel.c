@@ -5,6 +5,7 @@
 #include "../device/disk.h"
 
 #include "irq.h"
+#include "ipc.h"
 #include "scheduler.h"
 #include "file.h"
 #include <stdproc.h>
@@ -15,6 +16,8 @@ void kernel_handler_rst(ctx_t* ctx) {
         scheduler_initialise(ctx);
 
         file_initialise();
+
+        ipc_initialise();
 
         PL011_puts(UART0, "Configuring Timer\n", 18);
 
@@ -29,10 +32,6 @@ void kernel_handler_rst(ctx_t* ctx) {
         UART0->IMSC |= 0x00000010; // enable UART    (Rx) interrupt
         UART0->CR = 0x00000301; // enable UART0 (Tx+Rx) - see PL011 manual p3-15
         UART1->CR = 0x00000301; // enable UART1 (Tx+Rx)
-
-        // Write a '1' at the beginning of the disk
-        const uint8_t ch = '1';
-        disk_wr(0, &ch, 1);
 
         PL011_puts(UART0, "Configuring Interrupt Controller\n", 33);
 
@@ -254,6 +253,35 @@ void kernel_handler_svc(ctx_t* ctx, uint32_t id) {
                         char** argv = (char**)(ctx->gpr[2]);
 
                         scheduler_exec(ctx, function, argc, argv);
+
+                        break;
+                }
+                case 1001 : { // smessage
+                        char* buf = (char*)(ctx->gpr[0]);
+                        size_t nbytes = (size_t)(ctx->gpr[1]);
+                        pid_t from = (pid_t)(ctx->gpr[2]);
+                        pid_t to = (pid_t)(ctx->gpr[3]);
+
+                        ipc_send_message(buf, nbytes, from, to);
+
+                        break;
+                }
+                case 1002 : { // rmessagefr
+                        char* buf = (char*)(ctx->gpr[0]);
+                        size_t nbytes = (size_t)(ctx->gpr[1]);
+                        pid_t from = (pid_t)(ctx->gpr[2]);
+                        pid_t to = (pid_t)(ctx->gpr[3]);
+
+                        ipc_receive_message_from(buf, nbytes, from, to);
+
+                        break;
+                }
+                case 1003 : { // rmessage
+                        char* buf = (char*)(ctx->gpr[0]);
+                        size_t nbytes = (size_t)(ctx->gpr[1]);
+                        pid_t to = (pid_t)(ctx->gpr[2]);
+
+                        ipc_receive_any_message(buf, nbytes, to);
 
                         break;
                 }

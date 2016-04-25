@@ -123,3 +123,5 @@ Example: `rm /MYFILE1.TXT`
 The implementation of TAILQ is from FreeBSD.
 
 The implementation of `stdarg.h` is from GCC.
+
+Standard type definitions are from http://minirighi.sourceforge.net/html/types_8h-source.html

@@ -35,4 +35,8 @@ int32_t _fstat(filedesc_t fd, fat16_dir_entry_t* buf);
 
 void* _sbrk(int32_t incr);
 
+int32_t _smessage(char* buf, size_t nbytes, pid_t from, pid_t to);
+int32_t _rmessagefr(char* buf, size_t nbytes, pid_t from, pid_t to);
+int32_t _rmessage(char* buf, size_t nbytes, pid_t to);
+
 #endif
