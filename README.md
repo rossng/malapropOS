@@ -17,10 +17,10 @@ MalapropOS has a custom libc called `mlibc`.
 * A priority-based scheduling algorithm
 * Basic FAT16 support
 * Basic shell utilities: `cd`, `ls`, `cat`, `mkdir`, `pwd`
+* Asynchronous message-passing IPC
 
 ### In progress
 
-* Message-passing IPC
 
 ### Planned
 
@@ -78,6 +78,8 @@ By default, jobs run in the foreground in low priority. To run a process in the 
 While a foreground process is executing, you can terminate it by pressing `Ctrl+C`. When the shell process is rescheduled, it will terminate the schedule. Try running `P0` and press `Ctrl+C` while it is running.
 
 To see high-priority mode in action, try running `P0 !` and pressing `Ctrl+C`. Because the shell is low-priority, execution of `P0` will not be terminated and will complete normally.
+
+To see IPC in action, run `messenger`. This program forks itself, then the parent sends a message to the queue and the child receives it.
 
 ### `P0` and `P1`
 Print out a series of ascending numbers and then exits. For an example of concurrent process execution, run `P0 &` followed by `P1 &` too see their interleaved output.
