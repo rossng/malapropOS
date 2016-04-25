@@ -3,7 +3,7 @@
 *.o
 *.gch
 *.a
-*.bin
+disk.bin
 *.elf
 *.out
 *.i
