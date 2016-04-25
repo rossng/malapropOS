@@ -467,11 +467,13 @@ int32_t write_to_file(fat16_t* fs, fat16_dir_entry_t* entry, uint32_t offset_byt
         uint8_t* current_cluster_data = stdmem_allocate(fs->sectors_per_cluster * fs->bytes_per_sector);
 
         uint32_t current_cluster_index = 0; // The index of this cluster chain that we are at
+        uint16_t previous_cluster_num = 0;
         uint16_t current_cluster_num = entry->first_cluster; // The cluster number (wrt the filesystem)
 
         uint32_t num_bytes_written = 0;
 
         while (0x0001 < current_cluster_num && current_cluster_num < 0xfff0 && current_cluster_index < data_starts_in_cluster) {
+                previous_cluster_num = current_cluster_num;
                 current_cluster_num = get_successor_cluster(fs, current_cluster_num);
                 current_cluster_index++;
         }
@@ -483,6 +485,7 @@ int32_t write_to_file(fat16_t* fs, fat16_dir_entry_t* entry, uint32_t offset_byt
         write_cluster(fs, current_cluster_num, current_cluster_data);
         num_bytes_written += num_bytes_to_write_to_first_cluster;
 
+        previous_cluster_num = current_cluster_num;
         current_cluster_num = get_successor_cluster(fs, current_cluster_num);
         current_cluster_index++;
 
@@ -494,8 +497,27 @@ int32_t write_to_file(fat16_t* fs, fat16_dir_entry_t* entry, uint32_t offset_byt
                 write_cluster(fs, current_cluster_num, current_cluster_data);
                 num_bytes_written += num_bytes_to_write_to_cluster;
 
+                previous_cluster_num = current_cluster_num;
                 current_cluster_num = get_successor_cluster(fs, current_cluster_num);
                 current_cluster_index++;
+        }
+
+        while (num_bytes_written < num_bytes) {
+                uint16_t next_free_cluster_num = find_first_free_cluster(fs);
+                if (next_free_cluster_num < 2) {
+                        return num_bytes_written;
+                }
+                set_successor_cluster(fs, previous_cluster_num, next_free_cluster_num);
+                set_successor_cluster(fs, next_free_cluster_num, 0xFFFF);
+
+                current_cluster_num = next_free_cluster_num;
+                load_cluster(fs, current_cluster_num, current_cluster_data);
+
+                uint32_t num_bytes_to_write_to_cluster = (num_bytes - num_bytes_written) > bytes_per_cluster ? bytes_per_cluster : (num_bytes - num_bytes_written);
+                stdmem_copy(current_cluster_data, &buf[num_bytes_written], num_bytes_to_write_to_cluster);
+                write_cluster(fs, current_cluster_num, current_cluster_data);
+                num_bytes_written += num_bytes_to_write_to_cluster;
+                previous_cluster_num = current_cluster_num;
         }
 
         return num_bytes_written;

@@ -113,6 +113,21 @@ Remove the specified file. At the moment, only absolute paths are accepted.
 
 Example: `rm /MYFILE1.TXT`
 
+## `writemany`
+Write a long example string repeatedly to a file. At the moment, only absolute paths are accepted.
+
+The string "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789" will be written to the specified file the specfieid number of times.
+
+Example: `writemany /MYFILE1.TXT 15` will write the string 15 times. If `MYFILE1.TXT` currently only occupies one cluster, it will be expanded to fit the text.
+
+### TODO: `proc`
+Display the list of non-terminated processes.
+
+### TODO: `kill`
+Terminate the process with the specified PID.
+
+Example: `kill 10`
+
 ## IPC
 
 MalapropOS implements asynchronous message passing. A simple demonstration can be seen by running `messenger`. This program forks itself, then the parent sends a message to the queue and the child receives it.
